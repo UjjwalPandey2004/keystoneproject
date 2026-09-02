@@ -1,0 +1,6 @@
+$kind: collection
+name: New Collection
+auth:
+  - id: f70203ea-4d3a-4baf-b3a8-ae316ef8d443
+    type: apikey
+    name: API Key
