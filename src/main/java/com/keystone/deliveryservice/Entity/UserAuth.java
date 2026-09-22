@@ -28,10 +28,12 @@ public class UserAuth {
 	private Long id ;
 	
 	@Column(nullable=false)
-	private String UserName;
+	private String userName;
+
+	
 	
 	@Column(unique=true,nullable=false)
-	private String UserEmail;
+	private String userEmail;
 	
 	@Column(nullable=false)
 	private String password;
@@ -87,21 +89,20 @@ public class UserAuth {
 	}
 
 	public String getUserName() {
-		return UserName;
+	    return userName;
 	}
 
 	public void setUserName(String userName) {
-		UserName = userName;
+	    this.userName = userName;
 	}
 
 	public String getUserEmail() {
-		return UserEmail;
+	    return userEmail;
 	}
 
 	public void setUserEmail(String userEmail) {
-		UserEmail = userEmail;
-	}
-
+	    this.userEmail = userEmail;
+}
 	public String getPhone() {
 		return phone;
 	}

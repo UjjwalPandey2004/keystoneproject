@@ -181,11 +181,10 @@ public class JWTUtil {
     }
 
     public String extractToken(String header) {
-    	if(header!=null && header.startsWith("bearer")) {
-    		return header.substring(7);
-    	}
-    	
-    	return null;
+        if (header != null && header.toLowerCase().startsWith("bearer ")) {
+            return header.substring(7).trim();
+        }
+        return null;
     }
     
     // Extract user role

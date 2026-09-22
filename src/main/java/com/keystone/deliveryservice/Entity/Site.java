@@ -40,6 +40,7 @@ public class Site {
 	 private String Country;
 	 private Long Zipcode;
 	 
+	 @com.fasterxml.jackson.annotation.JsonIgnore
 	 @ManyToOne(fetch=FetchType.LAZY)
 	 @JoinColumn(name="customer_id")
 	 private Customer customer;

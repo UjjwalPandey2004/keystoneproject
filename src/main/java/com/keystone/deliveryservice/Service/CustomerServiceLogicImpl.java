@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.keystone.deliveryservice.Entity.Customer;
-import com.keystone.deliveryservice.Repository.customerRepository;
+import com.keystone.deliveryservice.Repository.CustomerRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 public class CustomerServiceLogicImpl implements CustomerServiceLogic{
 
 	@Autowired
-	private customerRepository cusREPO;
+	private CustomerRepository cusREPO;
 	
 	@Override
 	public Customer createCustomer(Customer customer) {

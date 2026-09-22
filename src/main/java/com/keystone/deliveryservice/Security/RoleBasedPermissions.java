@@ -19,19 +19,19 @@ public class RoleBasedPermissions {
                         Permissions.DELETE_USER,
 
                         Permissions.CREATE_CUSTOMER,
-                        Permissions.UPTDATE_CUSTOMER,
+                        Permissions.UPDATE_CUSTOMER,
                         Permissions.VIEW_CUSTOMER,
                         Permissions.DELETE_CUSTOMER,
 
                         Permissions.CREATE_SITE,
-                        Permissions.UPTDATE_SITE,
+                        Permissions.UPDATE_SITE,
                         Permissions.VIEW_SITE,
                         Permissions.DELETE_SITE,
 
                         Permissions.CREATE_WORK_ORDER,
-                        Permissions.UPTDATE_WORK_ORDER,
+                        Permissions.UPDATE_WORK_ORDER,
                         Permissions.VIEW_WORK_ORDER,
-                        Permissions.ASSIN_WORK_ORDER,
+                        Permissions.ASSIGN_WORK_ORDER,
                         Permissions.CLOSE_WORK_ORDER,
                         Permissions.CANCEL_WORK_ORDER,
                         Permissions.DELETE_WORK_ORDER,
@@ -54,17 +54,17 @@ public class RoleBasedPermissions {
         permission.put(Role.DISPATCHER,
                 new HashSet<>(Arrays.asList(
                         Permissions.CREATE_CUSTOMER,
-                        Permissions.UPTDATE_CUSTOMER,
+                        Permissions.UPDATE_CUSTOMER,
                         Permissions.VIEW_CUSTOMER,
 
                         Permissions.CREATE_SITE,
-                        Permissions.UPTDATE_SITE,
+                        Permissions.UPDATE_SITE,
                         Permissions.VIEW_SITE,
 
                         Permissions.CREATE_WORK_ORDER,
-                        Permissions.UPTDATE_WORK_ORDER,
+                        Permissions.UPDATE_WORK_ORDER,
                         Permissions.VIEW_WORK_ORDER,
-                        Permissions.ASSIN_WORK_ORDER,
+                        Permissions.ASSIGN_WORK_ORDER,
                         Permissions.CANCEL_WORK_ORDER,
 
                         Permissions.VIEW_DASHBOARD

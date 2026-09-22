@@ -32,6 +32,7 @@ public class Customer {
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private long id;
 	
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	@OneToMany(
 		    mappedBy = "customer",
 		    cascade = CascadeType.ALL,
