@@ -1,8 +1,9 @@
 package com.keystone.deliveryservice.controller;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,8 +15,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.keystone.deliveryservice.DTO.ApiDtoMapper;
+import com.keystone.deliveryservice.DTO.CustomerRequestDTO;
+import com.keystone.deliveryservice.DTO.CustomerResponseDTO;
+import com.keystone.deliveryservice.DTO.SiteRequestDTO;
+import com.keystone.deliveryservice.DTO.SiteResponseDTO;
 import com.keystone.deliveryservice.Entity.Customer;
 import com.keystone.deliveryservice.Entity.Site;
 import com.keystone.deliveryservice.Service.CustomerServiceLogic;
@@ -43,49 +50,66 @@ public class CustomerController {
     @Operation(summary = "Create a new customer (Manager / Dispatcher)")
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<Customer> createCustomer(@Valid @RequestBody Customer customer) {
-        Customer created = customerService.createCustomer(customer);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    public ResponseEntity<CustomerResponseDTO> createCustomer(@Valid @RequestBody CustomerRequestDTO request) {
+        Customer created = customerService.createCustomer(ApiDtoMapper.toCustomerEntity(request));
+        return new ResponseEntity<>(ApiDtoMapper.toCustomerResponse(created), HttpStatus.CREATED);
     }
 
     @Operation(summary = "List all customers (Manager / Dispatcher)")
     @GetMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<List<Customer>> getAllCustomers() {
-        return ResponseEntity.ok(customerService.getAllCustomer());
+    public ResponseEntity<Page<CustomerResponseDTO>> getAllCustomers(
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                Sort.by("companyName").ascending());
+        return ResponseEntity.ok(customerService.searchCustomers(query, pageable).map(ApiDtoMapper::toCustomerResponse));
     }
 
     @Operation(summary = "Get a customer by ID")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
-    public ResponseEntity<Customer> getCustomerById(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<CustomerResponseDTO> getCustomerById(@PathVariable Long id, Authentication authentication) {
         Customer customer = customerService.getCustomer(id);
         authorizationService.requireCustomerAccess(customer, authentication);
-        return ResponseEntity.ok(customer);
+        return ResponseEntity.ok(ApiDtoMapper.toCustomerResponse(customer));
     }
 
     @Operation(summary = "Update customer details (Manager / Dispatcher)")
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, @Valid @RequestBody Customer customer) {
-        return ResponseEntity.ok(customerService.updateCustomer(id, customer));
+    public ResponseEntity<CustomerResponseDTO> updateCustomer(@PathVariable Long id,
+            @Valid @RequestBody CustomerRequestDTO request) {
+        Customer updated = customerService.updateCustomer(id, ApiDtoMapper.toCustomerEntity(request));
+        return ResponseEntity.ok(ApiDtoMapper.toCustomerResponse(updated));
     }
 
     @Operation(summary = "Get all sites belonging to a customer")
     @GetMapping("/{customerId}/sites")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
-    public ResponseEntity<List<Site>> getSitesByCustomer(@PathVariable Long customerId, Authentication authentication) {
+    public ResponseEntity<Page<SiteResponseDTO>> getSitesByCustomer(
+            @PathVariable Long customerId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
         authorizationService.requireCustomerAccess(customerService.getCustomer(customerId), authentication);
-        return ResponseEntity.ok(siteService.getSiteByCustomer(customerId));
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                Sort.by("SiteName").ascending());
+        return ResponseEntity.ok(siteService.searchSitesByCustomer(customerId, query, pageable)
+                .map(ApiDtoMapper::toSiteResponse));
     }
 
     @Operation(summary = "Add a new site to a customer (Manager / Dispatcher)")
     @PostMapping("/{customerId}/sites")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<Site> addSiteToCustomer(@PathVariable Long customerId, @Valid @RequestBody Site site) {
+    public ResponseEntity<SiteResponseDTO> addSiteToCustomer(@PathVariable Long customerId,
+            @Valid @RequestBody SiteRequestDTO request) {
         Customer customer = customerService.getCustomer(customerId);
+        Site site = ApiDtoMapper.toSiteEntity(request);
         site.setCustomer(customer);
         Site created = siteService.createSite(site);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+        return new ResponseEntity<>(ApiDtoMapper.toSiteResponse(created), HttpStatus.CREATED);
     }
 }

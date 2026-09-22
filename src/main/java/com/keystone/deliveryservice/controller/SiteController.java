@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.keystone.deliveryservice.Entity.Site;
+import com.keystone.deliveryservice.DTO.ApiDtoMapper;
+import com.keystone.deliveryservice.DTO.SiteRequestDTO;
+import com.keystone.deliveryservice.DTO.SiteResponseDTO;
 import com.keystone.deliveryservice.Service.SiteService;
 import com.keystone.deliveryservice.Service.ResourceAuthorizationService;
 
@@ -34,17 +37,19 @@ public class SiteController {
     @Operation(summary = "Get site by ID")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
-    public ResponseEntity<Site> getSiteById(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<SiteResponseDTO> getSiteById(@PathVariable Long id, Authentication authentication) {
         Site site = siteService.getSite(id);
         authorizationService.requireSiteAccess(site, authentication);
-        return ResponseEntity.ok(site);
+        return ResponseEntity.ok(ApiDtoMapper.toSiteResponse(site));
     }
 
     @Operation(summary = "Update site details (Manager / Dispatcher)")
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<Site> updateSite(@PathVariable Long id, @Valid @RequestBody Site site) {
-        return ResponseEntity.ok(siteService.UpdateSite(id, site));
+    public ResponseEntity<SiteResponseDTO> updateSite(@PathVariable Long id,
+            @Valid @RequestBody SiteRequestDTO request) {
+        Site updated = siteService.UpdateSite(id, ApiDtoMapper.toSiteEntity(request));
+        return ResponseEntity.ok(ApiDtoMapper.toSiteResponse(updated));
     }
 
     @Operation(summary = "Delete a site (Manager only)")

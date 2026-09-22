@@ -1,7 +1,7 @@
 package com.keystone.deliveryservice.Service;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.keystone.deliveryservice.Entity.Customer;
 
 public interface CustomerServiceLogic{
@@ -9,7 +9,7 @@ public interface CustomerServiceLogic{
 	Customer createCustomer(Customer customer);
 	Customer updateCustomer(Long id , Customer customer);
 	Customer getCustomer (Long id);
-	List<Customer>getAllCustomer();
+	Page<Customer> searchCustomers(String query, Pageable pageable);
 		
 	void deleteCustomer(String email);
 	

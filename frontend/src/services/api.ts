@@ -52,8 +52,8 @@ export const authApi = {
 
 export const customerApi = {
   getAll: async () => {
-    const res = await api.get<Customer[]>('/api/customers');
-    return res.data;
+    const res = await api.get<{ content: Customer[] }>('/api/customers');
+    return res.data.content;
   },
   getById: async (id: number) => {
     const res = await api.get<Customer>(`/api/customers/${id}`);
@@ -68,8 +68,8 @@ export const customerApi = {
     return res.data;
   },
   getSites: async (customerId: number) => {
-    const res = await api.get<Site[]>(`/api/customers/${customerId}/sites`);
-    return res.data;
+    const res = await api.get<{ content: Site[] }>(`/api/customers/${customerId}/sites`);
+    return res.data.content;
   },
   addSite: async (customerId: number, data: Partial<Site>) => {
     const res = await api.post<Site>(`/api/customers/${customerId}/sites`, data);
