@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { workOrderApi, customerApi } from '../services/api';
-import { Customer, Priority, Site, WorkOrder, WorkOrderStatus } from '../types';
+import { workOrderApi, customerApi, userApi } from '../services/api';
+import { Customer, Priority, Site, User, WorkOrder, WorkOrderStatus } from '../types';
 import { Plus, UserCheck, Clock, AlertTriangle, MapPin, X } from 'lucide-react';
 
 const STATUS_COLUMNS: { key: WorkOrderStatus; title: string; color: string }[] = [
@@ -17,6 +17,7 @@ export const DispatcherBoard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSites, setSelectedSites] = useState<Site[]>([]);
+  const [technicians, setTechnicians] = useState<User[]>([]);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,18 +30,21 @@ export const DispatcherBoard: React.FC = () => {
   const [newPriority, setNewPriority] = useState<Priority>('MEDIUM');
   const [newCustomerId, setNewCustomerId] = useState<number | ''>('');
   const [newSiteId, setNewSiteId] = useState<number | ''>('');
-  const [technicianId, setTechnicianId] = useState<number>(3); // Seed tech ID = 3
+  const [technicianId, setTechnicianId] = useState<number | ''>('');
   const [assignNote, setAssignNote] = useState('');
 
   const fetchBoardData = async () => {
     try {
       setLoading(true);
-      const [woRes, custRes] = await Promise.all([
+      const [woRes, custRes, techRes] = await Promise.all([
         workOrderApi.list({ size: 100 }),
         customerApi.getAll(),
+        userApi.getTechnicians(),
       ]);
       setWorkOrders(woRes.content || []);
       setCustomers(custRes || []);
+      setTechnicians(techRes || []);
+      if (techRes?.length && !technicianId) setTechnicianId(techRes[0].id || '');
     } catch (err) {
       console.error('Failed to load board data', err);
     } finally {
@@ -87,10 +91,10 @@ export const DispatcherBoard: React.FC = () => {
 
   const handleAssignTechnician = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showAssignModal) return;
+    if (!showAssignModal || !technicianId) return;
 
     try {
-      await workOrderApi.assign(showAssignModal.id, technicianId, assignNote);
+      await workOrderApi.assign(showAssignModal.id, Number(technicianId), assignNote);
       setShowAssignModal(null);
       setAssignNote('');
       fetchBoardData();
@@ -330,10 +334,15 @@ export const DispatcherBoard: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Select Field Technician</label>
                 <select
                   value={technicianId}
-                  onChange={(e) => setTechnicianId(Number(e.target.value))}
+                  onChange={(e) => setTechnicianId(e.target.value ? Number(e.target.value) : '')}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
                 >
-                  <option value={3}>Field Technician (tech@meridian.com)</option>
+                  {technicians.length === 0 && <option value="">No technicians available</option>}
+                  {technicians.map((technician) => (
+                    <option key={technician.id} value={technician.id}>
+                      {technician.userName} ({technician.userEmail})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -350,7 +359,7 @@ export const DispatcherBoard: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                 <button type="button" onClick={() => setShowAssignModal(null)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">Confirm Assignment</button>
+                <button type="submit" className="btn btn-primary" disabled={!technicianId}>Confirm Assignment</button>
               </div>
             </form>
           </div>

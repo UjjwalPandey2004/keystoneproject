@@ -7,8 +7,9 @@ import { ManagerDashboard } from './pages/ManagerDashboard';
 import { CustomerSites } from './pages/CustomerSites';
 import { TechnicianFieldView } from './pages/TechnicianFieldView';
 import { CustomerPortal } from './pages/CustomerPortal';
+import { UserManagement } from './pages/UserManagement';
 
-export type Tab = 'dashboard' | 'board' | 'field' | 'customers' | 'customer';
+export type Tab = 'dashboard' | 'board' | 'field' | 'customers' | 'customer' | 'users';
 
 const defaultTabForRole = (role: string | null): Tab => {
   if (role === 'MANAGER') return 'dashboard';
@@ -42,6 +43,8 @@ const App: React.FC = () => {
         {currentTab === 'field' && (role === 'MANAGER' || role === 'TECHNICIAN') && <TechnicianFieldView />}
 
         {currentTab === 'customer' && <CustomerPortal />}
+
+        {currentTab === 'users' && role === 'MANAGER' && <UserManagement />}
       </main>
     </div>
   );

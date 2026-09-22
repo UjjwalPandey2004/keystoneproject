@@ -79,6 +79,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
             </button>
           )}
 
+          {role === 'MANAGER' && (
+            <button
+              onClick={() => onTabChange('users')}
+              className={`btn btn-sm ${currentTab === 'users' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ background: currentTab === 'users' ? '#4f46e5' : '#1e293b', color: '#ffffff', border: '1px solid #334155' }}
+            >
+              <UserIcon size={14} /> Users
+            </button>
+          )}
+
           {(role === 'MANAGER' || role === 'DISPATCHER') && (
             <button
               onClick={() => onTabChange('customers')}

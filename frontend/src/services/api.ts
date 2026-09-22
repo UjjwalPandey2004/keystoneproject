@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Customer, DashboardMetrics, Part, Site, WorkOrder, WorkOrderStatus } from '../types';
+import { Customer, DashboardMetrics, Part, Site, User, WorkOrder, WorkOrderStatus } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -91,6 +91,21 @@ export const siteApi = {
   },
 };
 
+export const userApi = {
+  getTechnicians: async () => {
+    const res = await api.get<User[]>('/api/users/technicians');
+    return res.data;
+  },
+  list: async () => {
+    const res = await api.get<{ content: User[] }>('/api/users');
+    return res.data.content;
+  },
+  create: async (data: { userName: string; userEmail: string; password: string; phone?: string; role: string }) => {
+    const res = await api.post<User>('/api/users', data);
+    return res.data;
+  },
+};
+
 export const workOrderApi = {
   list: async (params?: { status?: WorkOrderStatus; customerId?: number; page?: number; size?: number }) => {
     const res = await api.get<{ content: WorkOrder[]; totalElements: number }>('/api/work-orders', { params });
@@ -142,8 +157,8 @@ export const partApi = {
 };
 
 export const reportApi = {
-  getSummary: async () => {
-    const res = await api.get<DashboardMetrics>('/api/reports/summary');
+  getSummary: async (params?: { customerId?: number; siteId?: number; technicianId?: number }) => {
+    const res = await api.get<DashboardMetrics>('/api/reports/summary', { params });
     return res.data;
   },
 };

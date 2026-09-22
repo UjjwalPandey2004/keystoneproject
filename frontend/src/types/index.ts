@@ -135,7 +135,10 @@ export interface DashboardMetrics {
   cancelledOrders: number;
   totalOpen: number;
   overdueOrders: number;
+  atRiskOrders: number;
   slaCompliancePercentage: number;
   totalClosed: number;
   totalClosedWithinSla: number;
+  technicianBreakdown: Record<string, number>;
+  siteBreakdown: Record<string, number>;
 }

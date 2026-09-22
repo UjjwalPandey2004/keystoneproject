@@ -60,6 +60,29 @@ password is `password` and must be changed before any real deployment.
 PostgreSQL intentionally uses host port 5433 to avoid common conflicts with a
 locally installed database on port 5432.
 
+## Architecture
+
+```text
+Browser -> Nginx/React -> Spring Boot REST API -> PostgreSQL
+                              |                     |
+                              +-- JWT/RBAC          +-- Flyway migrations
+                              +-- SLA scheduler
+                              +-- after-commit notification log
+```
+
+- Managers use dashboards, reports, inventory and user administration.
+- Dispatchers manage customers, sites, work orders and assignments.
+- Technicians can access and update only work assigned to them.
+- Customers can access requests belonging only to their organization.
+- Inventory rows are locked during consumption and database constraints prevent
+  negative stock.
+- Anonymous registration always creates a customer account; privileged roles
+  can only be created by a manager.
+
+The API health endpoint is <http://localhost:8080/actuator/health>. GitHub
+Actions runs the Java 21 backend tests and the production frontend build for
+pull requests and pushes to `main`.
+
 ## Tests and builds
 
 Backend tests run as part of the backend Docker image build. To run them with

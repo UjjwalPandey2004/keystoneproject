@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.keystone.deliveryservice.DTO.DashboardMetricsDTO;
 import com.keystone.deliveryservice.Service.DashboardService;
@@ -24,7 +25,10 @@ public class ReportController {
     @Operation(summary = "Get operational summary metrics and SLA compliance rate (Manager / Dispatcher)")
     @GetMapping("/summary")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER')")
-    public ResponseEntity<DashboardMetricsDTO> getSummaryMetrics() {
-        return ResponseEntity.ok(dashboardService.getDashboardMetrics());
+    public ResponseEntity<DashboardMetricsDTO> getSummaryMetrics(
+            @RequestParam(required = false) Long customerId,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long technicianId) {
+        return ResponseEntity.ok(dashboardService.getDashboardMetrics(customerId, siteId, technicianId));
     }
 }

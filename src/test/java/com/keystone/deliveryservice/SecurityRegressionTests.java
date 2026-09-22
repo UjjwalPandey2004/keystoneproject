@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.keystone.deliveryservice.DTO.LogPartsDTO;
 import com.keystone.deliveryservice.DTO.LogTimeDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
+import com.keystone.deliveryservice.DTO.TransitionStatusDTO;
 import com.keystone.deliveryservice.ENUM.Role;
 import com.keystone.deliveryservice.ENUM.WorkOrderStatus;
 import com.keystone.deliveryservice.Entity.Customer;
@@ -156,6 +157,34 @@ class SecurityRegressionTests {
         assertEquals(1, part.getStockQty());
         verify(partRepository, never()).save(any(Part.class));
         verify(partUsageRepository, never()).save(any(PartUsage.class));
+        verify(workOrderRepository, never()).save(any(WorkOrder.class));
+    }
+
+    @Test
+    void lifecycleRejectsStatusJumps() {
+        UserAuth manager = UserAuth.builder().id(1L).role(Role.MANAGER).build();
+        WorkOrder workOrder = WorkOrder.builder().id(10L).status(WorkOrderStatus.NEW).build();
+        when(workOrderRepository.findById(10L)).thenReturn(Optional.of(workOrder));
+
+        assertThrows(IllegalStateException.class,
+                () -> workOrderService.transitionStatus(10L,
+                        TransitionStatusDTO.builder().status(WorkOrderStatus.COMPLETED).build(), manager));
+
+        assertEquals(WorkOrderStatus.NEW, workOrder.getStatus());
+        verify(workOrderRepository, never()).save(any(WorkOrder.class));
+    }
+
+    @Test
+    void onlyManagerCanCloseCompletedWorkOrder() {
+        UserAuth dispatcher = UserAuth.builder().id(2L).role(Role.DISPATCHER).build();
+        WorkOrder workOrder = WorkOrder.builder().id(11L).status(WorkOrderStatus.COMPLETED).build();
+        when(workOrderRepository.findById(11L)).thenReturn(Optional.of(workOrder));
+
+        assertThrows(AccessDeniedException.class,
+                () -> workOrderService.transitionStatus(11L,
+                        TransitionStatusDTO.builder().status(WorkOrderStatus.CLOSED).build(), dispatcher));
+
+        assertEquals(WorkOrderStatus.COMPLETED, workOrder.getStatus());
         verify(workOrderRepository, never()).save(any(WorkOrder.class));
     }
 }
