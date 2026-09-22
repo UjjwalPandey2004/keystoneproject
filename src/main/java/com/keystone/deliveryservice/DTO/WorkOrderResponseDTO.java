@@ -25,6 +25,7 @@ public class WorkOrderResponseDTO {
     private WorkOrderStatus status;
     private LocalDateTime slaDueDate;
     private boolean slaBreached;
+    private boolean slaAtRisk;
 
     // Customer summary
     private Long customerId;

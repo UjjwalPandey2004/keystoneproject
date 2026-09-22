@@ -25,6 +25,7 @@ import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
 import com.keystone.deliveryservice.ENUM.Role;
 import com.keystone.deliveryservice.ENUM.WorkOrderStatus;
 import com.keystone.deliveryservice.Entity.Customer;
+import com.keystone.deliveryservice.Entity.Part;
 import com.keystone.deliveryservice.Entity.PartUsage;
 import com.keystone.deliveryservice.Entity.TimeLog;
 import com.keystone.deliveryservice.Entity.UserAuth;
@@ -124,8 +125,37 @@ class SecurityRegressionTests {
         assertThrows(AccessDeniedException.class,
                 () -> workOrderService.logTime(1L, LogTimeDTO.builder().minutes(15).build(), otherTechnician));
 
-        verify(partRepository, never()).findById(any());
+        verify(partRepository, never()).findByIdForUpdate(any());
         verify(partUsageRepository, never()).save(any(PartUsage.class));
         verify(timeLogRepository, never()).save(any(TimeLog.class));
+    }
+
+    @Test
+    void insufficientStockIsRejectedBeforeAnyInventoryWrite() {
+        UserAuth technician = UserAuth.builder().id(3L).role(Role.TECHNICIAN).userName("Tech").build();
+        WorkOrder workOrder = WorkOrder.builder()
+                .id(1L)
+                .status(WorkOrderStatus.IN_PROGRESS)
+                .assignedTo(technician)
+                .totalPartsCost(0.0)
+                .build();
+        Part part = Part.builder()
+                .id(7L)
+                .name("Last filter")
+                .unitCost(10.0)
+                .stockQty(1)
+                .build();
+
+        when(workOrderRepository.findById(1L)).thenReturn(Optional.of(workOrder));
+        when(partRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(part));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> workOrderService.logParts(1L,
+                        LogPartsDTO.builder().partId(7L).quantity(2).build(), technician));
+
+        assertEquals(1, part.getStockQty());
+        verify(partRepository, never()).save(any(Part.class));
+        verify(partUsageRepository, never()).save(any(PartUsage.class));
+        verify(workOrderRepository, never()).save(any(WorkOrder.class));
     }
 }

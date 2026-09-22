@@ -21,6 +21,9 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     boolean existsByCode(String code);
 
+    @Query(value = "SELECT nextval('work_order_code_seq')", nativeQuery = true)
+    Long nextWorkOrderCodeValue();
+
     // Filtered & scoped pagination queries
     Page<WorkOrder> findByCustomerId(Long customerId, Pageable pageable);
 
@@ -35,6 +38,11 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     // SLA Monitoring queries
     @Query("SELECT w FROM WorkOrder w WHERE w.slaBreached = false AND w.status NOT IN ('CLOSED', 'CANCELLED') AND w.slaDueDate < :now")
     List<WorkOrder> findBreachedWorkOrders(@Param("now") LocalDateTime now);
+
+    @Query("SELECT w FROM WorkOrder w WHERE w.slaAtRisk = false AND w.slaBreached = false " +
+            "AND w.status NOT IN ('CLOSED', 'CANCELLED') AND w.slaDueDate > :now AND w.slaDueDate <= :latest")
+    List<WorkOrder> findPotentiallyAtRiskWorkOrders(@Param("now") LocalDateTime now,
+            @Param("latest") LocalDateTime latest);
 
     // Dashboard metrics
     long countByStatus(WorkOrderStatus status);

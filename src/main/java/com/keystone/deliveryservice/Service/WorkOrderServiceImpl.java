@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -70,6 +71,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Autowired
     private TimeLogRepository timeLogRepo;
 
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
     public WorkOrderResponseDTO createWorkOrder(CreateWorkOrderDTO dto, UserAuth currentUser) {
         Customer customer = customerRepo.findById(dto.getCustomerId())
@@ -107,6 +111,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .status(assignedTechnician != null ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.NEW)
                 .slaDueDate(slaDueDate)
                 .slaBreached(false)
+                .slaAtRisk(false)
                 .customer(customer)
                 .site(site)
                 .assignedTo(assignedTechnician)
@@ -253,6 +258,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
         historyRepo.save(history);
 
+        eventPublisher.publishEvent(new NotificationEvent(
+                technician.getUserEmail(),
+                "Work order assigned: " + workOrder.getCode(),
+                "You have been assigned " + workOrder.getCode() + " - " + workOrder.getTitle()
+                        + ". SLA due: " + workOrder.getSlaDueDate()));
+
         return mapToDTO(workOrder);
     }
 
@@ -305,7 +316,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             throw new IllegalStateException("Cannot log parts on a closed/cancelled work order.");
         }
 
-        Part part = partRepo.findById(dto.getPartId())
+        // Lock the inventory row until this transaction commits so concurrent
+        // technicians cannot both consume the same remaining stock.
+        Part part = partRepo.findByIdForUpdate(dto.getPartId())
                 .orElseThrow(() -> new IllegalArgumentException("Part not found with ID: " + dto.getPartId()));
 
         // Check stock: Stock cannot go negative (Acceptance criteria F6)
@@ -498,13 +511,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     }
 
     private String generateUniqueWorkOrderCode() {
-        long count = workOrderRepo.count();
-        String code = String.format("WO-%04d", count + 1001);
-        while (workOrderRepo.existsByCode(code)) {
-            count++;
-            code = String.format("WO-%04d", count + 1001);
-        }
-        return code;
+        return String.format("WO-%04d", workOrderRepo.nextWorkOrderCodeValue());
     }
 
     private WorkOrderResponseDTO mapToDTO(WorkOrder w) {
@@ -558,6 +565,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .status(w.getStatus())
                 .slaDueDate(w.getSlaDueDate())
                 .slaBreached(w.isSlaBreached())
+                .slaAtRisk(w.isSlaAtRisk())
                 .customerId(w.getCustomer().getId())
                 .customerName(w.getCustomer().getCompanyName())
                 .customerEmail(w.getCustomer().getEmail())

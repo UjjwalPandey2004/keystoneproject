@@ -98,6 +98,7 @@ export interface WorkOrder {
   status: WorkOrderStatus;
   slaDueDate: string;
   slaBreached: boolean;
+  slaAtRisk: boolean;
 
   customerId: number;
   customerName: string;
