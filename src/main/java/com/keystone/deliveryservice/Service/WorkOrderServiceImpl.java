@@ -134,7 +134,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
         historyRepo.save(initialHistory);
 
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -144,7 +144,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
 
         enforceReadAccess(workOrder, currentUser);
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -154,7 +154,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with code: " + code));
 
         enforceReadAccess(workOrder, currentUser);
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -193,7 +193,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         }
 
         List<WorkOrderResponseDTO> dtoList = page.getContent().stream()
-                .map(this::mapToDTO)
+                .map(order -> mapToDTOForUser(order, currentUser))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(dtoList, pageable, page.getTotalElements());
@@ -585,5 +585,23 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .partsUsed(partsDTOs)
                 .timeLogs(timeDTOs)
                 .build();
+    }
+
+    private WorkOrderResponseDTO mapToDTOForUser(WorkOrder workOrder, UserAuth currentUser) {
+        WorkOrderResponseDTO response = mapToDTO(workOrder);
+        if (currentUser.getRole() != Role.CUSTOMER) {
+            return response;
+        }
+
+        response.setCustomerEmail(null);
+        response.setAssignedToEmail(null);
+        response.setTotalPartsCost(null);
+        response.getStatusHistory().forEach(history -> history.setChangedByEmail(null));
+        response.getPartsUsed().forEach(part -> {
+            part.setUnitCost(null);
+            part.setTotalCost(null);
+        });
+        response.getTimeLogs().forEach(time -> time.setTechnicianEmail(null));
+        return response;
     }
 }
