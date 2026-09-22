@@ -35,3 +35,13 @@ CREATE TABLE IF NOT EXISTS sites (
     zipcode BIGINT,
     CONSTRAINT fk_site_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS email_logs (
+    id BIGSERIAL PRIMARY KEY,
+    recipient_email VARCHAR(255),
+    cc_email VARCHAR(255),
+    subject VARCHAR(255),
+    body VARCHAR(5000),
+    sent_status BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

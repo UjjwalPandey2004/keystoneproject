@@ -3,24 +3,28 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Shield, Wrench, ClipboardList, BarChart3, Building, LogOut, User as UserIcon, Moon, Sun } from 'lucide-react';
 import { Role } from '../types';
+import { Tab } from '../App';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  currentTab: Tab;
+  onTabChange: (tab: Tab) => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
   const { user, role, logout, login } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
   const handleQuickSwitch = async (targetRole: Role, email: string) => {
     try {
       await login(email, 'password');
-      if (targetRole === 'MANAGER') setCurrentTab('dashboard');
-      else if (targetRole === 'DISPATCHER') setCurrentTab('board');
-      else if (targetRole === 'TECHNICIAN') setCurrentTab('field');
-      else if (targetRole === 'CUSTOMER') setCurrentTab('customer');
+      if (targetRole === 'MANAGER') onTabChange('dashboard');
+      else if (targetRole === 'DISPATCHER') onTabChange('board');
+      else if (targetRole === 'TECHNICIAN') onTabChange('field');
+      else if (targetRole === 'CUSTOMER') onTabChange('customer');
     } catch (err) {
       console.error('Quick switch failed', err);
     }
   };
-
-  const [currentTab, setCurrentTab] = React.useState<'dashboard' | 'board' | 'field' | 'customers' | 'customer'>('dashboard');
 
   return (
     <header style={{ background: isDark ? '#1e293b' : '#0f172a', color: isDark ? '#f1f5f9' : '#ffffff', borderBottom: '1px solid #334155' }}>
@@ -47,7 +51,9 @@ export const Navbar: React.FC = () => {
               transition: 'all 0.3s ease'
             }}
           >
-            <Moon size={18} color={isDark ? '#f1f5f9' : '#334155'} />
+            {isDark
+              ? <Sun size={18} color="#f1f5f9" />
+              : <Moon size={18} color="#334155" />}
           </button>
         </div>
 
@@ -55,7 +61,7 @@ export const Navbar: React.FC = () => {
         <nav style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {(role === 'MANAGER' || role === 'DISPATCHER') && (
             <button
-              onClick={() => setCurrentTab('board')}
+              onClick={() => onTabChange('board')}
               className={`btn btn-sm ${currentTab === 'board' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ background: currentTab === 'board' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
             >
@@ -65,7 +71,7 @@ export const Navbar: React.FC = () => {
 
           {role === 'MANAGER' && (
             <button
-              onClick={() => setCurrentTab('dashboard')}
+              onClick={() => onTabChange('dashboard')}
               className={`btn btn-sm ${currentTab === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ background: currentTab === 'dashboard' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
             >
@@ -75,7 +81,7 @@ export const Navbar: React.FC = () => {
 
           {(role === 'MANAGER' || role === 'DISPATCHER') && (
             <button
-              onClick={() => setCurrentTab('customers')}
+              onClick={() => onTabChange('customers')}
               className={`btn btn-sm ${currentTab === 'customers' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ background: currentTab === 'customers' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
             >
@@ -85,7 +91,7 @@ export const Navbar: React.FC = () => {
 
           {(role === 'TECHNICIAN' || role === 'MANAGER') && (
             <button
-              onClick={() => setCurrentTab('field')}
+              onClick={() => onTabChange('field')}
               className={`btn btn-sm ${currentTab === 'field' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ background: currentTab === 'field' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
             >
@@ -95,7 +101,7 @@ export const Navbar: React.FC = () => {
 
           {(role === 'CUSTOMER' || role === 'MANAGER') && (
             <button
-              onClick={() => setCurrentTab('customer')}
+              onClick={() => onTabChange('customer')}
               className={`btn btn-sm ${currentTab === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ background: currentTab === 'customer' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
             >

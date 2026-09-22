@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
@@ -8,11 +8,22 @@ import { CustomerSites } from './pages/CustomerSites';
 import { TechnicianFieldView } from './pages/TechnicianFieldView';
 import { CustomerPortal } from './pages/CustomerPortal';
 
-type Tab = 'dashboard' | 'board' | 'field' | 'customers' | 'customer';
+export type Tab = 'dashboard' | 'board' | 'field' | 'customers' | 'customer';
+
+const defaultTabForRole = (role: string | null): Tab => {
+  if (role === 'MANAGER') return 'dashboard';
+  if (role === 'DISPATCHER') return 'board';
+  if (role === 'TECHNICIAN') return 'field';
+  return 'customer';
+};
 
 const App: React.FC = () => {
   const { role, isAuthenticated } = useAuth();
-  const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<Tab>(() => defaultTabForRole(role));
+
+  useEffect(() => {
+    setCurrentTab(defaultTabForRole(role));
+  }, [role]);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -20,7 +31,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      <Navbar />
+      <Navbar currentTab={currentTab} onTabChange={setCurrentTab} />
       <main className="main-content">
         {currentTab === 'dashboard' && role === 'MANAGER' && <ManagerDashboard />}
 

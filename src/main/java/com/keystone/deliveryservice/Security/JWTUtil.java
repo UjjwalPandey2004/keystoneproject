@@ -91,6 +91,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.keystone.deliveryservice.ENUM.Permissions;
 import com.keystone.deliveryservice.Entity.UserAuth;
@@ -109,15 +110,10 @@ public class JWTUtil {
     // Token validity: 12 hours
     private static final long VALIDATE_TIME = 12 * 60 * 60 * 1000L;
 
-    public JWTUtil() {
-
-        String secret = System.getenv("JWT_SECRET");
-
-        if (secret == null || secret.isEmpty()) {
-            // Must be at least 32 characters for HS256
-            secret = "MySuperSecretJwtKeyForDeliveryService123456";
+    public JWTUtil(@Value("${security.jwt.secret}") String secret) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException("JWT_SECRET must contain at least 32 characters");
         }
-
         key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 

@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS parts (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     sku VARCHAR(50) NOT NULL UNIQUE,
-    unit_cost NUMERIC(10, 2) NOT NULL,
+    unit_cost DOUBLE PRECISION NOT NULL,
     stock_qty INT NOT NULL DEFAULT 0,
     min_stock_qty INT DEFAULT 5,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS work_orders (
     customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     site_id BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     assigned_to_id BIGINT REFERENCES user_auth(id) ON DELETE SET NULL,
-    total_parts_cost NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    total_parts_cost DOUBLE PRECISION NOT NULL DEFAULT 0.00,
     total_labor_minutes INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS part_usages (
     work_order_id BIGINT NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
     part_id BIGINT NOT NULL REFERENCES parts(id) ON DELETE RESTRICT,
     quantity_used INT NOT NULL,
-    unit_cost NUMERIC(10, 2) NOT NULL,
-    total_cost NUMERIC(10, 2) NOT NULL,
+    unit_cost DOUBLE PRECISION NOT NULL,
+    total_cost DOUBLE PRECISION NOT NULL,
     used_by_user_id BIGINT REFERENCES user_auth(id) ON DELETE SET NULL,
     used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

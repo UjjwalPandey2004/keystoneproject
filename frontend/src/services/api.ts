@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Customer, DashboardMetrics, Part, Site, WorkOrder, WorkOrderStatus } from '../types';
 
 const api = axios.create({
-  baseURL: '', // Uses Vite proxy to http://localhost:7373
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },
