@@ -1,9 +1,7 @@
 package com.keystone.deliveryservice.DTO;
 
-import com.keystone.deliveryservice.ENUM.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,11 +27,4 @@ public class RegisterRequestDTO {
 
     private String phone;
 
-    @NotNull(message = "Role is required")
-    private Role role;
-
-    // Getter for userEmail
-    public String getUserEmail() {
-        return userEmail;
-    }
 }

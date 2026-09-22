@@ -27,7 +27,7 @@ public class UserAuthController {
     @Autowired
     private UserAuthService userAuthService;
 
-    @Operation(summary = "Register a new user with a specific role")
+    @Operation(summary = "Register a new customer account")
     @PostMapping("/register")
     public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO register) {
         return ResponseEntity.ok(userAuthService.register(register));

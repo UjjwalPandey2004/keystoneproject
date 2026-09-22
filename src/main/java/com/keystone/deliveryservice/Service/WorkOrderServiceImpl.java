@@ -299,6 +299,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         WorkOrder workOrder = workOrderRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
 
+        enforceTechnicianAssignment(workOrder, currentUser);
+
         if (workOrder.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot log parts on a closed/cancelled work order.");
         }
@@ -351,6 +353,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     public TimeLogDTO logTime(Long id, LogTimeDTO dto, UserAuth currentUser) {
         WorkOrder workOrder = workOrderRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
+
+        enforceTechnicianAssignment(workOrder, currentUser);
 
         if (workOrder.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot log labor time on a closed/cancelled work order.");
@@ -482,6 +486,14 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             if (workOrder.getAssignedTo() == null || !workOrder.getAssignedTo().getId().equals(currentUser.getId())) {
                 throw new AccessDeniedException("Technicians can only view work orders assigned to them.");
             }
+        }
+    }
+
+    private void enforceTechnicianAssignment(WorkOrder workOrder, UserAuth currentUser) {
+        if (currentUser.getRole() == Role.TECHNICIAN
+                && (workOrder.getAssignedTo() == null
+                    || !workOrder.getAssignedTo().getId().equals(currentUser.getId()))) {
+            throw new AccessDeniedException("Technicians can only update work orders assigned to them.");
         }
     }
 

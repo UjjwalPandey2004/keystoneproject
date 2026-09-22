@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.keystone.deliveryservice.Entity.Customer;
 import com.keystone.deliveryservice.Entity.Site;
 import com.keystone.deliveryservice.Service.CustomerServiceLogic;
+import com.keystone.deliveryservice.Service.ResourceAuthorizationService;
 import com.keystone.deliveryservice.Service.SiteService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +36,9 @@ public class CustomerController {
 
     @Autowired
     private SiteService siteService;
+
+    @Autowired
+    private ResourceAuthorizationService authorizationService;
 
     @Operation(summary = "Create a new customer (Manager / Dispatcher)")
     @PostMapping
@@ -53,8 +58,10 @@ public class CustomerController {
     @Operation(summary = "Get a customer by ID")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
-    public ResponseEntity<Customer> getCustomerById(@PathVariable Long id) {
-        return ResponseEntity.ok(customerService.getCustomer(id));
+    public ResponseEntity<Customer> getCustomerById(@PathVariable Long id, Authentication authentication) {
+        Customer customer = customerService.getCustomer(id);
+        authorizationService.requireCustomerAccess(customer, authentication);
+        return ResponseEntity.ok(customer);
     }
 
     @Operation(summary = "Update customer details (Manager / Dispatcher)")
@@ -67,7 +74,8 @@ public class CustomerController {
     @Operation(summary = "Get all sites belonging to a customer")
     @GetMapping("/{customerId}/sites")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
-    public ResponseEntity<List<Site>> getSitesByCustomer(@PathVariable Long customerId) {
+    public ResponseEntity<List<Site>> getSitesByCustomer(@PathVariable Long customerId, Authentication authentication) {
+        authorizationService.requireCustomerAccess(customerService.getCustomer(customerId), authentication);
         return ResponseEntity.ok(siteService.getSiteByCustomer(customerId));
     }
 
