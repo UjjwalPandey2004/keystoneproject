@@ -65,6 +65,10 @@ public class WorkOrder {
     @Builder.Default
     private boolean slaBreached = false;
 
+    @Column(name = "sla_at_risk", nullable = false)
+    @Builder.Default
+    private boolean slaAtRisk = false;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;

@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { Customer, DashboardMetrics, Part, Site, WorkOrder, WorkOrderStatus } from '../types';
+import { Customer, DashboardMetrics, Part, Site, User, WorkOrder, WorkOrderStatus } from '../types';
 
 const api = axios.create({
-  baseURL: '', // Uses Vite proxy to http://localhost:7373
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -52,8 +52,8 @@ export const authApi = {
 
 export const customerApi = {
   getAll: async () => {
-    const res = await api.get<Customer[]>('/api/customers');
-    return res.data;
+    const res = await api.get<{ content: Customer[] }>('/api/customers');
+    return res.data.content;
   },
   getById: async (id: number) => {
     const res = await api.get<Customer>(`/api/customers/${id}`);
@@ -68,8 +68,8 @@ export const customerApi = {
     return res.data;
   },
   getSites: async (customerId: number) => {
-    const res = await api.get<Site[]>(`/api/customers/${customerId}/sites`);
-    return res.data;
+    const res = await api.get<{ content: Site[] }>(`/api/customers/${customerId}/sites`);
+    return res.data.content;
   },
   addSite: async (customerId: number, data: Partial<Site>) => {
     const res = await api.post<Site>(`/api/customers/${customerId}/sites`, data);
@@ -88,6 +88,21 @@ export const siteApi = {
   },
   delete: async (id: number) => {
     await api.delete(`/api/sites/${id}`);
+  },
+};
+
+export const userApi = {
+  getTechnicians: async () => {
+    const res = await api.get<User[]>('/api/users/technicians');
+    return res.data;
+  },
+  list: async () => {
+    const res = await api.get<{ content: User[] }>('/api/users');
+    return res.data.content;
+  },
+  create: async (data: { userName: string; userEmail: string; password: string; phone?: string; role: string }) => {
+    const res = await api.post<User>('/api/users', data);
+    return res.data;
   },
 };
 
@@ -142,8 +157,8 @@ export const partApi = {
 };
 
 export const reportApi = {
-  getSummary: async () => {
-    const res = await api.get<DashboardMetrics>('/api/reports/summary');
+  getSummary: async (params?: { customerId?: number; siteId?: number; technicianId?: number }) => {
+    const res = await api.get<DashboardMetrics>('/api/reports/summary', { params });
     return res.data;
   },
 };

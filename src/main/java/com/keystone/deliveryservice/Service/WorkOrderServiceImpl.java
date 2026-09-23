@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -70,6 +71,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Autowired
     private TimeLogRepository timeLogRepo;
 
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
     public WorkOrderResponseDTO createWorkOrder(CreateWorkOrderDTO dto, UserAuth currentUser) {
         Customer customer = customerRepo.findById(dto.getCustomerId())
@@ -107,6 +111,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .status(assignedTechnician != null ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.NEW)
                 .slaDueDate(slaDueDate)
                 .slaBreached(false)
+                .slaAtRisk(false)
                 .customer(customer)
                 .site(site)
                 .assignedTo(assignedTechnician)
@@ -129,7 +134,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
         historyRepo.save(initialHistory);
 
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -139,7 +144,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
 
         enforceReadAccess(workOrder, currentUser);
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -149,7 +154,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with code: " + code));
 
         enforceReadAccess(workOrder, currentUser);
-        return mapToDTO(workOrder);
+        return mapToDTOForUser(workOrder, currentUser);
     }
 
     @Override
@@ -188,7 +193,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         }
 
         List<WorkOrderResponseDTO> dtoList = page.getContent().stream()
-                .map(this::mapToDTO)
+                .map(order -> mapToDTOForUser(order, currentUser))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(dtoList, pageable, page.getTotalElements());
@@ -253,6 +258,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
         historyRepo.save(history);
 
+        eventPublisher.publishEvent(new NotificationEvent(
+                technician.getUserEmail(),
+                "Work order assigned: " + workOrder.getCode(),
+                "You have been assigned " + workOrder.getCode() + " - " + workOrder.getTitle()
+                        + ". SLA due: " + workOrder.getSlaDueDate()));
+
         return mapToDTO(workOrder);
     }
 
@@ -299,11 +310,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         WorkOrder workOrder = workOrderRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
 
+        enforceTechnicianAssignment(workOrder, currentUser);
+
         if (workOrder.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot log parts on a closed/cancelled work order.");
         }
 
-        Part part = partRepo.findById(dto.getPartId())
+        // Lock the inventory row until this transaction commits so concurrent
+        // technicians cannot both consume the same remaining stock.
+        Part part = partRepo.findByIdForUpdate(dto.getPartId())
                 .orElseThrow(() -> new IllegalArgumentException("Part not found with ID: " + dto.getPartId()));
 
         // Check stock: Stock cannot go negative (Acceptance criteria F6)
@@ -351,6 +366,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     public TimeLogDTO logTime(Long id, LogTimeDTO dto, UserAuth currentUser) {
         WorkOrder workOrder = workOrderRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
+
+        enforceTechnicianAssignment(workOrder, currentUser);
 
         if (workOrder.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot log labor time on a closed/cancelled work order.");
@@ -485,14 +502,16 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         }
     }
 
-    private String generateUniqueWorkOrderCode() {
-        long count = workOrderRepo.count();
-        String code = String.format("WO-%04d", count + 1001);
-        while (workOrderRepo.existsByCode(code)) {
-            count++;
-            code = String.format("WO-%04d", count + 1001);
+    private void enforceTechnicianAssignment(WorkOrder workOrder, UserAuth currentUser) {
+        if (currentUser.getRole() == Role.TECHNICIAN
+                && (workOrder.getAssignedTo() == null
+                    || !workOrder.getAssignedTo().getId().equals(currentUser.getId()))) {
+            throw new AccessDeniedException("Technicians can only update work orders assigned to them.");
         }
-        return code;
+    }
+
+    private String generateUniqueWorkOrderCode() {
+        return String.format("WO-%04d", workOrderRepo.nextWorkOrderCodeValue());
     }
 
     private WorkOrderResponseDTO mapToDTO(WorkOrder w) {
@@ -546,6 +565,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .status(w.getStatus())
                 .slaDueDate(w.getSlaDueDate())
                 .slaBreached(w.isSlaBreached())
+                .slaAtRisk(w.isSlaAtRisk())
                 .customerId(w.getCustomer().getId())
                 .customerName(w.getCustomer().getCompanyName())
                 .customerEmail(w.getCustomer().getEmail())
@@ -565,5 +585,23 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .partsUsed(partsDTOs)
                 .timeLogs(timeDTOs)
                 .build();
+    }
+
+    private WorkOrderResponseDTO mapToDTOForUser(WorkOrder workOrder, UserAuth currentUser) {
+        WorkOrderResponseDTO response = mapToDTO(workOrder);
+        if (currentUser.getRole() != Role.CUSTOMER) {
+            return response;
+        }
+
+        response.setCustomerEmail(null);
+        response.setAssignedToEmail(null);
+        response.setTotalPartsCost(null);
+        response.getStatusHistory().forEach(history -> history.setChangedByEmail(null));
+        response.getPartsUsed().forEach(part -> {
+            part.setUnitCost(null);
+            part.setTotalCost(null);
+        });
+        response.getTimeLogs().forEach(time -> time.setTechnicianEmail(null));
+        return response;
     }
 }

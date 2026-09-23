@@ -43,6 +43,7 @@ export const ManagerDashboard: React.FC = () => {
   const kpis = [
     { label: 'Open Work Orders', value: metrics.totalOpen, color: '#4f46e5', icon: <Activity size={18} />, bg: '#eef2ff' },
     { label: 'Overdue / SLA Breached', value: metrics.overdueOrders, color: '#ef4444', icon: <AlertTriangle size={18} />, bg: '#fef2f2' },
+    { label: 'SLA At Risk', value: metrics.atRiskOrders, color: '#ea580c', icon: <Clock size={18} />, bg: '#fff7ed' },
     { label: 'Completed', value: metrics.completedOrders, color: '#059669', icon: <CheckCircle2 size={18} />, bg: '#ecfdf5' },
     { label: 'Closed & Signed Off', value: metrics.closedOrders, color: '#475569', icon: <Timer size={18} />, bg: '#f1f5f9' },
   ];
@@ -147,6 +148,25 @@ export const ManagerDashboard: React.FC = () => {
             })}
           </div>
         </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
+        {[
+          { title: 'Work Orders by Technician', data: metrics.technicianBreakdown },
+          { title: 'Work Orders by Site', data: metrics.siteBreakdown },
+        ].map((section) => (
+          <div className="card" key={section.title}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>{section.title}</h3>
+            {Object.keys(section.data || {}).length === 0 ? (
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No matching work orders.</p>
+            ) : Object.entries(section.data).map(([label, count]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #e2e8f0' }}>
+                <span style={{ color: '#475569', fontSize: '0.85rem' }}>{label}</span>
+                <strong>{count}</strong>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
 
       {/* Recent Work Orders */}

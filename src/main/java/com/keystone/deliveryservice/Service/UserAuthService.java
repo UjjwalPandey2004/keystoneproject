@@ -13,6 +13,7 @@ import com.keystone.deliveryservice.DTO.ForgotPasswordDTO;
 import com.keystone.deliveryservice.DTO.LoginRequestDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
 import com.keystone.deliveryservice.DTO.ResetPasswordDTO;
+import com.keystone.deliveryservice.ENUM.Role;
 import com.keystone.deliveryservice.Entity.UserAuth;
 import com.keystone.deliveryservice.Repository.UserAuthRepository;
 import com.keystone.deliveryservice.Security.JWTUtil;
@@ -49,7 +50,8 @@ public class UserAuthService {
         user.setUserEmail(register.getUserEmail());
         user.setPassword(passwordEncoder.encode(register.getPassword()));
         user.setPhone(register.getPhone());
-        user.setRole(register.getRole());
+        // Anonymous registration must never be able to grant a privileged role.
+        user.setRole(Role.CUSTOMER);
 
         user = userAuthRepo.save(user);
 

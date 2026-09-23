@@ -1,6 +1,7 @@
 package com.keystone.deliveryservice.Service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -20,11 +21,22 @@ public class EmailLogService {
     
     @Autowired
     private EmailLogRepository emailLogRepo;
+
+    @Value("${notifications.mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${app.base-url:http://localhost:5173}")
+    private String appBaseUrl;
     
     public void sendResetPasswordMail(String to, String token) {
 
-        String resetPasswordLink =
-                "http://localhost:7373/user_auth/reset-password?token=" + token;
+        String resetPasswordLink = appBaseUrl + "/reset-password?token=" + token;
+
+        if (!mailEnabled) {
+            emailLogRepo.save(new EmailLog(to, "Reset Your Password",
+                    "Password reset requested. Email delivery is disabled in this environment.", false));
+            return;
+        }
 
         SimpleMailMessage message = new SimpleMailMessage();
 
@@ -42,7 +54,10 @@ public class EmailLogService {
     	
     	boolean sendStatus=false;
     	
-    	try {
+		try {
+			if (!mailEnabled) {
+				throw new IllegalStateException("Email delivery is disabled");
+			}
     		MimeMessage message = javaMailSender.createMimeMessage();
     		
     		MimeMessageHelper helper = new MimeMessageHelper(message,true);
