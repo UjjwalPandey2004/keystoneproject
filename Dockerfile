@@ -1,9 +1,8 @@
-# syntax=docker/dockerfile:1.7
 FROM maven:3.9.11-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY pom.xml ./
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -q package
+RUN mvn -q package
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
