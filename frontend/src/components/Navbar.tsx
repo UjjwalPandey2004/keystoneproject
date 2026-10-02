@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { KeystoneLogo } from './KeystoneLogo';
 import { Tab } from '../navigation';
 
 interface NavbarProps {
@@ -25,7 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onTabChange }) => {
   return (
     <header className="ks-topbar">
       <div className="ks-brand">
-        <div className="ks-brand-mark">K</div>
+        <KeystoneLogo size={38} />
         <div>
           <div className="ks-brand-name">KEYSTONE</div>
           <div className="ks-brand-sub">Field Service Management Platform</div>

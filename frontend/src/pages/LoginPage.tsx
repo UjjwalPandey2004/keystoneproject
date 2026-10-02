@@ -1,179 +1,284 @@
 import React, { useState } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Wrench, ClipboardList, Building2, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
+import { authApi } from '../services/api';
+import { KeystoneLogo } from '../components/KeystoneLogo';
+
+type Mode = 'login' | 'register' | 'forgot' | 'reset';
+
+// The password-reset email links to /reset-password?token=..., which opens this page in "reset" mode.
+const resetTokenFromUrl = () =>
+  window.location.pathname.startsWith('/reset-password') ? new URLSearchParams(window.location.search).get('token') : null;
+
+const errorMessage = (err: any, fallback: string) => {
+  const data = err.response?.data;
+  const fieldError = data?.fieldErrors && Object.values(data.fieldErrors)[0];
+  return (fieldError as string) || data?.message || fallback;
+};
+
+const FEATURES = ['Work Order Management', 'Role-Based Access', 'Field Service Operations'];
 
 export const LoginPage: React.FC = () => {
-  const { login, demoMode } = useAuth();
+  const { login, setQuickAuth } = useAuth();
+  const [resetToken] = useState(resetTokenFromUrl);
+  const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isDark } = useTheme();
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const switchMode = (next: Mode) => {
+    setMode(next);
     setError(null);
+    setNotice(null);
+    setPassword('');
+    setConfirm('');
+    setShowPassword(false);
+    if (next === 'login' && window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+    }
+  };
+
+  const run = async (action: () => Promise<void>) => {
+    setError(null);
+    setNotice(null);
     setLoading(true);
     try {
-      await login(email, password);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please verify your credentials.');
+      await action();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickLogin = async (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('password');
-    setError(null);
-    setLoading(true);
-    try {
-      await login(demoEmail, 'password');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login with demo credentials.');
-    } finally {
-      setLoading(false);
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(async () => {
+      try {
+        await login(email, password);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Invalid email or password. Please verify your credentials.');
+      }
+    });
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      return;
     }
+    run(async () => {
+      try {
+        const res = await authApi.register({ userName: name, userEmail: email, password, phone: phone || undefined });
+        setQuickAuth(res.email, res.role, res.name || name, res.token);
+      } catch (err: any) {
+        setError(errorMessage(err, 'Registration failed. Please try again.'));
+      }
+    });
+  };
+
+  const handleForgot = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(async () => {
+      try {
+        await authApi.forgotPassword(email);
+      } catch {
+        // Same answer either way, so the form does not reveal which emails have accounts.
+      }
+      setNotice('If an account exists for that email, a password reset link has been sent to it.');
+    });
+  };
+
+  const handleReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 8) {
+      setError('New password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+    run(async () => {
+      try {
+        await authApi.resetPassword(resetToken || '', password);
+        switchMode('login');
+        setNotice('Your password has been reset. Sign in with your new password.');
+      } catch (err: any) {
+        setError(errorMessage(err, 'This reset link is invalid or has expired.'));
+      }
+    });
+  };
+
+  const passwordField = (label: string, value: string, onChange: (v: string) => void, autoComplete: string, placeholder: string) => (
+    <div className="kl-field">
+      <label className="kl-label">{label}</label>
+      <div className="kl-input-wrap">
+        <Lock size={18} className="kl-input-icon" />
+        <input
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          className="kl-input kl-input-pad-right"
+        />
+        <button
+          type="button"
+          className="kl-eye"
+          onClick={() => setShowPassword((v) => !v)}
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+
+  const emailField = (
+    <div className="kl-field">
+      <label className="kl-label">Work Email</label>
+      <div className="kl-input-wrap">
+        <Mail size={18} className="kl-input-icon" />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoComplete="email"
+          placeholder="Enter your work email"
+          className="kl-input"
+        />
+      </div>
+    </div>
+  );
+
+  const heading: Record<Mode, { title: string; sub: string }> = {
+    login: { title: 'Sign In', sub: 'Login to your Keystone account' },
+    register: { title: 'Create Account', sub: 'Register a new customer account' },
+    forgot: { title: 'Forgot Password', sub: 'We will email you a link to reset it' },
+    reset: { title: 'Reset Password', sub: 'Choose a new password for your account' },
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' : 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' }}>
-      <div style={{ maxWidth: 900, width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 32, alignItems: 'center' }}>
-        
-        {/* Left Side: Brand & Overview */}
-        <div style={{ color: isDark ? '#f1f5f9' : '#ffffff' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(79, 70, 229, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', padding: '6px 14px', borderRadius: 9999, marginBottom: 16 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8' }} />
-            <span style={{ fontSize: '0.8rem', color: isDark ? '#c7d2fe' : '#334155', fontWeight: 600, letterSpacing: '0.05em' }}>ZIDIO ENGINEERING PROJECT</span>
-          </div>
+    <div className="kl-page">
+      <div className="kl-shape kl-shape-top" aria-hidden="true" />
+      <div className="kl-shape kl-shape-bottom" aria-hidden="true" />
+      <div className="kl-watermark" aria-hidden="true">K</div>
 
-          <h1 style={{ fontSize: '2.4rem', fontWeight: 800, lineHeight: 1.15, marginBottom: 16, letterSpacing: '-0.02em' }}>
-            Project KEYSTONE
-          </h1>
-          <p style={{ fontSize: '1.05rem', color: isDark ? '#94a3b8' : '#334155', lineHeight: 1.6, marginBottom: 24 }}>
-            Commercial facilities maintenance and field-service platform for Meridian Facilities Management. Governed work-order lifecycle, role-based access, inventory integrity, and real-time SLA tracking.
+      <div className="kl-layout">
+        {/* Left: branding */}
+        <section className="kl-brand">
+          <div className="kl-brand-logo"><KeystoneLogo size={132} /></div>
+          <h1 className="kl-brand-name">KEYSTONE</h1>
+          <p className="kl-brand-tagline">Field Service Management Platform</p>
+          <p className="kl-brand-desc">
+            Commercial facilities maintenance and field-service platform for Meridian Facilities Management.
           </p>
+          <ul className="kl-features">
+            {FEATURES.map((feature) => (
+              <li key={feature}>
+                <span className="kl-check"><Check size={14} strokeWidth={3} /></span>
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </section>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: isDark ? '#cbd5e1' : '#64748b', fontSize: '0.9rem' }}>
-              <CheckCircle2 size={18} color="#34d399" />
-              <span>Spring Boot 3 + PostgreSQL + Flyway Schema Migrations</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: isDark ? '#cbd5e1' : '#64748b', fontSize: '0.9rem' }}>
-              <CheckCircle2 size={18} color="#34d399" />
-              <span>Stateless JWT Authentication & 4 Role-Based Boundaries</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: isDark ? '#cbd5e1' : '#64748b', fontSize: '0.9rem' }}>
-              <CheckCircle2 size={18} color="#34d399" />
-              <span>Guarded Lifecycle State Machine with Append-Only Audit Trail</span>
-            </div>
+        {/* Right: login card */}
+        <section className="kl-card">
+          <div className="kl-card-brand">
+            <KeystoneLogo size={52} />
+            <span>KEYSTONE</span>
           </div>
-        </div>
 
-        {/* Right Side: Login Card & Demo Quick Logins */}
-        <div style={{ background: isDark ? '#334155' : '#ffffff', borderRadius: 16, padding: 32, boxShadow: isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.5)' : '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a', marginBottom: 6 }}>Sign In</h2>
-          <p style={{ fontSize: '0.875rem', color: isDark ? '#94a3b8' : '#64748b', marginBottom: 20 }}>{demoMode ? 'Select a role or sign in with your credentials.' : 'Sign in with your credentials.'}</p>
+          <h2 className="kl-title">{heading[mode].title}</h2>
+          <p className="kl-subtitle">{heading[mode].sub}</p>
 
           {error && (
-            <div style={{ background: isDark ? '#3f3f4f' : '#fef2f2', border: isDark ? '1px solid #4f46e5' : '1px solid #fecaca', color: isDark ? '#9f7ae2' : '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+            <div className="kl-alert kl-alert-error" role="alert">
               <AlertCircle size={16} />
               <span>{error}</span>
             </div>
           )}
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 4 }}>Work Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="e.g. admin@meridian.com"
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), borderRadius: 6, fontSize: '0.9rem', outline: 'none', background: isDark ? '#3f3f4f' : '#fff', color: isDark ? '#f1f5f9' : '#0f172a' }}
-              />
+          {notice && (
+            <div className="kl-alert kl-alert-ok" role="status">
+              <CheckCircle2 size={16} />
+              <span>{notice}</span>
             </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 4 }}>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), borderRadius: 6, fontSize: '0.9rem', outline: 'none', background: isDark ? '#3f3f4f' : '#fff', color: isDark ? '#f1f5f9' : '#0f172a' }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{ width: '100%', padding: '11px 0', marginTop: 6, fontSize: '0.95rem', background: isDark ? '#3f3f4f' : '#3f3f4f', color: isDark ? '#f1f5f9' : '#fff' }}
-            >
-              <KeyRound size={16} /> {loading ? 'Authenticating...' : 'Sign In to Keystone'}
-            </button>
-          </form>
-
-          {/* Seed Quick-Login Buttons */}
-          {demoMode && (
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: isDark ? '1px solid #475569' : '1px solid #e2e8f0' }}>
-            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
-              One-Click Seed Logins (For Review & Demo)
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@meridian.com')}
-                style={{ background: isDark ? '#3f3f4f' : '#f8fafc', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), padding: '8px 10px', borderRadius: 6, textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.8rem', color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  <Shield size={14} color="#4f46e5" /> Manager
-                </div>
-                <div style={{ fontSize: '0.7rem', color: isDark ? '#94a3b8' : '#64748b' }}>Full system / SLA</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('dispatcher@meridian.com')}
-                style={{ background: isDark ? '#3f3f4f' : '#f8fafc', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), padding: '8px 10px', borderRadius: 6, textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.8rem', color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  <ClipboardList size={14} color="#0284c7" /> Dispatcher
-                </div>
-                <div style={{ fontSize: '0.7rem', color: isDark ? '#94a3b8' : '#64748b' }}>Kanban / Assign</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('tech@meridian.com')}
-                style={{ background: isDark ? '#3f3f4f' : '#f8fafc', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), padding: '8px 10px', borderRadius: 6, textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.8rem', color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  <Wrench size={14} color="#d97706" /> Technician
-                </div>
-                <div style={{ fontSize: '0.7rem', color: isDark ? '#94a3b8' : '#64748b' }}>Field / Parts / Time</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('customer@meridian.com')}
-                style={{ background: isDark ? '#3f3f4f' : '#f8fafc', border: '1px solid ' + (isDark ? '#475569' : '#cbd5e1'), padding: '8px 10px', borderRadius: 6, textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.8rem', color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  <Building2 size={14} color="#059669" /> Customer
-                </div>
-                <div style={{ fontSize: '0.7rem', color: isDark ? '#94a3b8' : '#64748b' }}>Raise / Track</div>
-              </button>
-            </div>
-          </div>
           )}
 
-        </div>
+          {mode === 'login' && (
+            <form onSubmit={handleLogin}>
+              {emailField}
+              {passwordField('Password', password, setPassword, 'current-password', 'Enter your password')}
+              <div className="kl-row-end">
+                <button type="button" className="kl-link" onClick={() => switchMode('forgot')}>Forgot Password?</button>
+              </div>
+              <button type="submit" className="kl-submit" disabled={loading}>
+                {loading ? 'Signing in…' : <>Sign In to Keystone <ArrowRight size={18} /></>}
+              </button>
+            </form>
+          )}
 
+          {mode === 'register' && (
+            <form onSubmit={handleRegister}>
+              <div className="kl-field">
+                <label className="kl-label">Full Name</label>
+                <div className="kl-input-wrap">
+                  <UserIcon size={18} className="kl-input-icon" />
+                  <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" placeholder="Enter your full name" className="kl-input" />
+                </div>
+              </div>
+              {emailField}
+              <div className="kl-field">
+                <label className="kl-label">Phone <span className="kl-optional">(optional)</span></label>
+                <div className="kl-input-wrap">
+                  <Phone size={18} className="kl-input-icon" />
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="Enter your phone number" className="kl-input" />
+                </div>
+              </div>
+              {passwordField('Password', password, setPassword, 'new-password', 'At least 6 characters')}
+              {passwordField('Confirm Password', confirm, setConfirm, 'new-password', 'Repeat your password')}
+              <button type="submit" className="kl-submit" disabled={loading}>
+                {loading ? 'Creating account…' : <>Create Account <ArrowRight size={18} /></>}
+              </button>
+            </form>
+          )}
+
+          {mode === 'forgot' && (
+            <form onSubmit={handleForgot}>
+              {emailField}
+              <button type="submit" className="kl-submit" disabled={loading}>
+                {loading ? 'Sending…' : <>Send Reset Link <ArrowRight size={18} /></>}
+              </button>
+            </form>
+          )}
+
+          {mode === 'reset' && (
+            <form onSubmit={handleReset}>
+              {passwordField('New Password', password, setPassword, 'new-password', 'At least 8 characters')}
+              {passwordField('Confirm New Password', confirm, setConfirm, 'new-password', 'Repeat your new password')}
+              <button type="submit" className="kl-submit" disabled={loading}>
+                {loading ? 'Saving…' : <>Reset Password <ArrowRight size={18} /></>}
+              </button>
+            </form>
+          )}
+
+          <div className="kl-footer">
+            {mode === 'login' ? (
+              <span>Don't have an account? <button type="button" className="kl-link kl-link-underline" onClick={() => switchMode('register')}>Register here</button></span>
+            ) : (
+              <button type="button" className="kl-link" onClick={() => switchMode('login')}><ArrowLeft size={14} /> Back to Sign In</button>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
