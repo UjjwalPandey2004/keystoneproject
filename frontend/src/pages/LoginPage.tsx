@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User as UserIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, RotateCw, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
 import { KeystoneLogo } from '../components/KeystoneLogo';
 
-type Mode = 'login' | 'register' | 'forgot' | 'reset';
+type Mode = 'login' | 'register' | 'verify' | 'forgot' | 'reset';
+
+const RESEND_SECONDS = 60;
 
 // The password-reset email links to /reset-password?token=..., which opens this page in "reset" mode.
 const resetTokenFromUrl = () =>
@@ -19,7 +21,7 @@ const errorMessage = (err: any, fallback: string) => {
 const FEATURES = ['Work Order Management', 'Role-Based Access', 'Field Service Operations'];
 
 export const LoginPage: React.FC = () => {
-  const { login, setQuickAuth } = useAuth();
+  const { login } = useAuth();
   const [resetToken] = useState(resetTokenFromUrl);
   const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'login');
   const [email, setEmail] = useState('');
@@ -31,6 +33,15 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [otp, setOtp] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+
+  // Countdown for the "Resend code" button.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -39,6 +50,7 @@ export const LoginPage: React.FC = () => {
     setPassword('');
     setConfirm('');
     setShowPassword(false);
+    setOtp('');
     if (next === 'login' && window.location.pathname !== '/') {
       window.history.replaceState(null, '', '/');
     }
@@ -61,6 +73,14 @@ export const LoginPage: React.FC = () => {
       try {
         await login(email, password);
       } catch (err: any) {
+        if (err.response?.data?.error === 'EMAIL_NOT_VERIFIED') {
+          // Right password, unverified email: go straight to the code screen.
+          setMode('verify');
+          setOtp('');
+          setError(null);
+          setNotice('Please verify your email before logging in. Enter the 6-digit code we emailed you, or request a new one.');
+          return;
+        }
         setError(err.response?.data?.message || 'Invalid email or password. Please verify your credentials.');
       }
     });
@@ -75,9 +95,45 @@ export const LoginPage: React.FC = () => {
     run(async () => {
       try {
         const res = await authApi.register({ userName: name, userEmail: email, password, phone: phone || undefined });
-        setQuickAuth(res.email, res.role, res.name || name, res.token);
+        // No session yet: the account must be verified with the emailed code first.
+        setMode('verify');
+        setOtp('');
+        setPassword('');
+        setConfirm('');
+        setResendIn(RESEND_SECONDS);
+        setNotice(res.message || `We sent a 6-digit code to ${email}.`);
       } catch (err: any) {
         setError(errorMessage(err, 'Registration failed. Please try again.'));
+      }
+    });
+  };
+
+  const handleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError('Enter the 6-digit code from the email.');
+      return;
+    }
+    run(async () => {
+      try {
+        await authApi.verifyEmail(email, otp.trim());
+        switchMode('login');
+        setNotice('Email verified. You can now sign in.');
+      } catch (err: any) {
+        setError(errorMessage(err, 'Invalid verification code.'));
+      }
+    });
+  };
+
+  const handleResend = () => {
+    if (resendIn > 0 || !email) return;
+    run(async () => {
+      try {
+        const res = await authApi.resendOtp(email);
+        setResendIn(RESEND_SECONDS);
+        setNotice(res.message);
+      } catch (err: any) {
+        setError(errorMessage(err, 'Could not send a new code.'));
       }
     });
   };
@@ -162,6 +218,7 @@ export const LoginPage: React.FC = () => {
   const heading: Record<Mode, { title: string; sub: string }> = {
     login: { title: 'Sign In', sub: 'Login to your Keystone account' },
     register: { title: 'Create Account', sub: 'Register a new customer account' },
+    verify: { title: 'Verify your email', sub: `Enter the code sent to ${email || 'your email'}` },
     forgot: { title: 'Forgot Password', sub: 'We will email you a link to reset it' },
     reset: { title: 'Reset Password', sub: 'Choose a new password for your account' },
   };
@@ -249,6 +306,40 @@ export const LoginPage: React.FC = () => {
               <button type="submit" className="kl-submit" disabled={loading}>
                 {loading ? 'Creating account…' : <>Create Account <ArrowRight size={18} /></>}
               </button>
+            </form>
+          )}
+
+          {mode === 'verify' && (
+            <form onSubmit={handleVerify}>
+              {!email && emailField}
+              <div className="kl-field">
+                <label className="kl-label" htmlFor="kl-otp">Verification code</label>
+                <div className="kl-input-wrap">
+                  <ShieldCheck size={18} className="kl-input-icon" />
+                  <input
+                    id="kl-otp"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    required
+                    placeholder="6-digit code"
+                    className="kl-input kl-otp"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="kl-row-end">
+                <button type="button" className="kl-link" onClick={handleResend} disabled={resendIn > 0 || loading}>
+                  <RotateCw size={14} /> {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+                </button>
+              </div>
+              <button type="submit" className="kl-submit" disabled={loading || otp.length !== 6}>
+                {loading ? 'Verifying…' : <>Verify Email <ArrowRight size={18} /></>}
+              </button>
+              <p className="kl-help">The code expires after 10 minutes and works once. Check your spam folder if it doesn't arrive.</p>
             </form>
           )}
 

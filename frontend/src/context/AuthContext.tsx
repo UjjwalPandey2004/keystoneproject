@@ -14,6 +14,9 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<void>;
   logout: () => void;
   setQuickAuth: (email: string, role: Role, name: string, token: string) => void;
+  // After a password change the server issues a new token; older ones stop working.
+  replaceToken: (token: string) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -110,6 +113,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     storeUser({ userEmail: email, userName: name, role });
   };
 
+  const replaceToken = (next: string) => {
+    localStorage.setItem('keystone_token', next);
+    setToken(next);
+  };
+
+  const refreshUser = async () => {
+    storeUser(await authApi.me());
+  };
+
   const logout = () => {
     authApi.logout(); // invalidates the token server-side, then clears the token from local storage
     localStorage.removeItem('keystone_user');
@@ -120,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, role, viewRole, setViewAs, isAuthenticated, demoMode, login, logout, setQuickAuth }}>
+    <AuthContext.Provider value={{ user, token, role, viewRole, setViewAs, isAuthenticated, demoMode, login, logout, setQuickAuth, replaceToken, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

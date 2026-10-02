@@ -1,35 +1,43 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+
+export type Theme = 'dark' | 'light';
 
 interface ThemeContextType {
+  theme: Theme;
   isDark: boolean;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const STORAGE_KEY = 'keystone_theme';
+
+// Dark is the KEYSTONE default; a saved choice wins on later visits.
+const readTheme = (): Theme => {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+};
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    // Check for saved theme or system preference
-    const saved = localStorage.getItem('keystone_theme');
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return saved ? saved === 'dark' : systemDark;
-  });
+  const [theme, setTheme] = useState<Theme>(readTheme);
 
+  // All colours come from CSS variables; this class switches the whole palette at once.
   useEffect(() => {
-    const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark-mode');
-      localStorage.setItem('keystone_theme', 'dark');
-    } else {
-      root.classList.remove('dark-mode');
-      localStorage.setItem('keystone_theme', 'light');
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    document.documentElement.style.colorScheme = theme;
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      /* storage unavailable: the choice just won't persist */
     }
-  }, [isDark]);
+  }, [theme]);
 
-  const toggleTheme = () => setIsDark((prev) => !prev);
+  const toggleTheme = () => setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, isDark: theme === 'dark', toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

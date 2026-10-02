@@ -29,32 +29,32 @@ export const ManagerDashboard: React.FC = () => {
   }, []);
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>Loading operational dashboard...</div>;
+    return <div style={{ textAlign: 'center', padding: 48, color: 'var(--ks-muted)' }}>Loading operational dashboard...</div>;
   }
 
   if (!metrics) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>
+      <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--ks-muted)' }}>
         No metrics available. Please ensure the backend and seeded data are ready.
       </div>
     );
   }
 
   const kpis = [
-    { label: 'Open Work Orders', value: metrics.totalOpen, color: '#4f46e5', icon: <Activity size={18} />, bg: '#eef2ff' },
-    { label: 'Overdue / SLA Breached', value: metrics.overdueOrders, color: '#ef4444', icon: <AlertTriangle size={18} />, bg: '#fef2f2' },
-    { label: 'SLA At Risk', value: metrics.atRiskOrders, color: '#ea580c', icon: <Clock size={18} />, bg: '#fff7ed' },
-    { label: 'Completed', value: metrics.completedOrders, color: '#059669', icon: <CheckCircle2 size={18} />, bg: '#ecfdf5' },
-    { label: 'Closed & Signed Off', value: metrics.closedOrders, color: '#475569', icon: <Timer size={18} />, bg: '#f1f5f9' },
+    { label: 'Open Work Orders', value: metrics.totalOpen, color: 'var(--ks-accent-text)', icon: <Activity size={18} />, bg: 'var(--ks-violet-tint)' },
+    { label: 'Overdue / SLA Breached', value: metrics.overdueOrders, color: '#ef4444', icon: <AlertTriangle size={18} />, bg: 'var(--ks-danger-tint)' },
+    { label: 'SLA At Risk', value: metrics.atRiskOrders, color: 'var(--ks-warning-text)', icon: <Clock size={18} />, bg: 'var(--ks-warning-tint)' },
+    { label: 'Completed', value: metrics.completedOrders, color: 'var(--ks-success-text)', icon: <CheckCircle2 size={18} />, bg: 'var(--ks-success-tint)' },
+    { label: 'Closed & Signed Off', value: metrics.closedOrders, color: 'var(--ks-muted)', icon: <Timer size={18} />, bg: 'var(--ks-neutral-tint)' },
   ];
 
   const statusRows: { key: keyof DashboardMetrics; label: string; color: string }[] = [
     { key: 'newOrders', label: 'New', color: '#3b82f6' },
     { key: 'assignedOrders', label: 'Assigned', color: '#8b5cf6' },
     { key: 'inProgressOrders', label: 'In Progress', color: '#f59e0b' },
-    { key: 'onHoldOrders', label: 'On Hold', color: '#ea580c' },
+    { key: 'onHoldOrders', label: 'On Hold', color: 'var(--ks-warning-text)' },
     { key: 'completedOrders', label: 'Completed', color: '#10b981' },
-    { key: 'closedOrders', label: 'Closed', color: '#475569' },
+    { key: 'closedOrders', label: 'Closed', color: 'var(--ks-muted)' },
     { key: 'cancelledOrders', label: 'Cancelled', color: '#ef4444' },
   ];
 
@@ -62,8 +62,8 @@ export const ManagerDashboard: React.FC = () => {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Operations Dashboard</h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Real-time work-order funnel and SLA compliance across all facilities.</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--ks-text)' }}>Operations Dashboard</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--ks-muted)' }}>Real-time work-order funnel and SLA compliance across all facilities.</p>
         </div>
         <button onClick={fetchDashboard} className="btn btn-secondary">
           <RefreshCw size={16} /> Refresh Metrics
@@ -78,11 +78,11 @@ export const ManagerDashboard: React.FC = () => {
               <div style={{ width: 36, height: 36, borderRadius: 8, background: kpi.bg, color: kpi.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {kpi.icon}
               </div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ks-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {kpi.label}
               </span>
             </div>
-            <p style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{kpi.value}</p>
+            <p style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--ks-text)', margin: 0 }}>{kpi.value}</p>
           </div>
         ))}
       </div>
@@ -91,16 +91,16 @@ export const ManagerDashboard: React.FC = () => {
         {/* SLA Compliance */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Gauge size={18} color="#4f46e5" />
+            <Gauge size={18} color="var(--ks-accent-text)" />
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>SLA Compliance</h3>
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--ks-muted)', marginBottom: 6 }}>
               <span>{metrics.totalClosedWithinSla} of {metrics.totalClosed} closed within SLA</span>
-              <strong style={{ color: '#0f172a' }}>{metrics.slaCompliancePercentage.toFixed(1)}%</strong>
+              <strong style={{ color: 'var(--ks-text)' }}>{metrics.slaCompliancePercentage.toFixed(1)}%</strong>
             </div>
-            <div style={{ background: '#f1f5f9', height: 12, borderRadius: 9999, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--ks-surface)', height: 12, borderRadius: 9999, overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%',
@@ -112,13 +112,13 @@ export const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#64748b' }}>
+          <div style={{ display: 'flex', gap: 12, paddingTop: 12, borderTop: '1px solid var(--ks-border)', fontSize: '0.8rem', color: 'var(--ks-muted)' }}>
             <div>
-              <span style={{ display: 'block', color: '#94a3b8' }}>Total Closed</span>
-              <strong style={{ color: '#0f172a', fontSize: '1.1rem' }}>{metrics.totalClosed}</strong>
+              <span style={{ display: 'block', color: 'var(--ks-dim)' }}>Total Closed</span>
+              <strong style={{ color: 'var(--ks-text)', fontSize: '1.1rem' }}>{metrics.totalClosed}</strong>
             </div>
             <div>
-              <span style={{ display: 'block', color: '#94a3b8' }}>Overdue</span>
+              <span style={{ display: 'block', color: 'var(--ks-dim)' }}>Overdue</span>
               <strong style={{ color: '#ef4444', fontSize: '1.1rem' }}>{metrics.overdueOrders}</strong>
             </div>
           </div>
@@ -127,7 +127,7 @@ export const ManagerDashboard: React.FC = () => {
         {/* Status Funnel */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <PlusCircle size={18} color="#4f46e5" />
+            <PlusCircle size={18} color="var(--ks-accent-text)" />
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Work Order Funnel</h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -138,8 +138,8 @@ export const ManagerDashboard: React.FC = () => {
                 : 0;
               return (
                 <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 100, fontSize: '0.78rem', color: '#475569', fontWeight: 500 }}>{row.label}</span>
-                  <div style={{ flex: 1, background: '#f1f5f9', height: 8, borderRadius: 9999, overflow: 'hidden' }}>
+                  <span style={{ width: 100, fontSize: '0.78rem', color: 'var(--ks-muted)', fontWeight: 500 }}>{row.label}</span>
+                  <div style={{ flex: 1, background: 'var(--ks-surface)', height: 8, borderRadius: 9999, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: row.color, borderRadius: 9999 }} />
                   </div>
                   <strong style={{ width: 30, textAlign: 'right', fontSize: '0.85rem' }}>{value}</strong>
@@ -158,10 +158,10 @@ export const ManagerDashboard: React.FC = () => {
           <div className="card" key={section.title}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>{section.title}</h3>
             {Object.keys(section.data || {}).length === 0 ? (
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No matching work orders.</p>
+              <p style={{ color: 'var(--ks-dim)', fontSize: '0.85rem' }}>No matching work orders.</p>
             ) : Object.entries(section.data).map(([label, count]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #e2e8f0' }}>
-                <span style={{ color: '#475569', fontSize: '0.85rem' }}>{label}</span>
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--ks-border)' }}>
+                <span style={{ color: 'var(--ks-muted)', fontSize: '0.85rem' }}>{label}</span>
                 <strong>{count}</strong>
               </div>
             ))}
@@ -173,15 +173,15 @@ export const ManagerDashboard: React.FC = () => {
       <div className="card" style={{ marginTop: 16 }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 14 }}>Latest Activity</h3>
         {recent.length === 0 ? (
-          <div style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center', padding: 24 }}>No recent work orders.</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--ks-dim)', textAlign: 'center', padding: 24 }}>No recent work orders.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {recent.map((wo) => (
-              <div key={wo.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, flexWrap: 'wrap' }}>
+              <div key={wo.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: 'var(--ks-surface)', borderRadius: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Clock size={14} color="#94a3b8" />
-                  <span style={{ fontWeight: 700, color: '#4f46e5', fontSize: '0.8rem' }}>{wo.code}</span>
-                  <span style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 600 }}>{wo.title}</span>
+                  <Clock size={14} color="var(--ks-dim)" />
+                  <span style={{ fontWeight: 700, color: 'var(--ks-accent-text)', fontSize: '0.8rem' }}>{wo.code}</span>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--ks-text)', fontWeight: 600 }}>{wo.title}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className={`badge badge-${wo.status.toLowerCase()}`}>{wo.status}</span>

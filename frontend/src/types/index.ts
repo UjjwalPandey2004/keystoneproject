@@ -18,6 +18,12 @@ export interface User {
   role: Role;
   phone?: string;
   customerId?: number;
+  emailVerified?: boolean;
+  // Technicians only.
+  location?: string | null;
+  available?: boolean | null;
+  currentJobs?: number | null;
+  joinedAt?: string | null;
 }
 
 export interface AuthState {
@@ -88,6 +94,9 @@ export interface TimeLog {
   minutes: number;
   note?: string;
   loggedAt: string;
+  workDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface WorkOrder {
@@ -112,6 +121,8 @@ export interface WorkOrder {
   assignedToId?: number;
   assignedToName?: string;
   assignedToEmail?: string;
+  assignedToLocation?: string | null;
+  technicianNotes?: string | null;
 
   totalPartsCost: number;
   totalLaborMinutes: number;
@@ -142,4 +153,114 @@ export interface DashboardMetrics {
   totalClosedWithinSla: number;
   technicianBreakdown: Record<string, number>;
   siteBreakdown: Record<string, number>;
+}
+
+export type NotificationType =
+  | 'WORK_ORDER_CREATED' | 'WORK_ORDER_ASSIGNED' | 'TECHNICIAN_ASSIGNMENT' | 'WORK_ORDER_STATUS'
+  | 'WORK_ORDER_COMPLETED' | 'CRITICAL_WORK_ORDER' | 'PAYMENT_PENDING' | 'PAYMENT_RECEIVED'
+  | 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED' | 'EMAIL_VERIFIED' | 'SECURITY' | 'CUSTOMER_REGISTERED' | 'ATTENDANCE';
+
+export interface AppNotification {
+  id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  referenceType?: 'WORK_ORDER' | 'PAYMENT' | null;
+  referenceId?: number | null;
+  referenceLabel?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export type PaymentMethod = 'CASH' | 'UPI' | 'UPI_QR' | 'CARD';
+export type UpiApp = 'GOOGLE_PAY' | 'PHONEPE' | 'PAYTM' | 'OTHER';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
+
+export interface Payment {
+  id: number;
+  reference: string;
+  workOrderId: number;
+  workOrderCode: string;
+  workOrderTitle: string;
+  customerId: number;
+  customerName: string;
+  payerName: string;
+  payerEmail: string;
+  payerPhone?: string | null;
+  customerAddress?: string | null;
+  workOrderDescription?: string | null;
+  upiApp?: UpiApp | null;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  transactionRef?: string | null;
+  failureReason?: string | null;
+  verifiedByName?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+  paidAt?: string | null;
+  upiUri?: string | null;
+}
+
+export interface PaymentConfig {
+  upiEnabled: boolean;
+  upiVpa?: string | null;
+  payeeName: string;
+  currency: string;
+}
+
+export interface Attachment {
+  id: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByName: string;
+  uploadedAt: string;
+}
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'ON_LEAVE' | 'HALF_DAY';
+
+export interface AttendanceRecord {
+  id?: number | null;
+  userId: number;
+  userName: string;
+  role: Role;
+  location?: string | null;
+  date: string;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  status: AttendanceStatus | 'NOT_MARKED';
+  hours?: number | null;
+  note?: string | null;
+  markedByName?: string | null;
+}
+
+export interface StaffMember {
+  id: number;
+  name: string;
+  role: Role;
+  email: string;
+  phone?: string | null;
+  location?: string | null;
+  available?: boolean | null;
+  currentJobs?: number | null;
+  todayAttendance: AttendanceStatus | 'NOT_MARKED';
+  joinedAt?: string | null;
+}
+
+export interface CustomerAccount {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  organisationId?: number | null;
+  organisationName?: string | null;
+  emailVerified: boolean;
+  status: 'ACTIVE' | 'UNVERIFIED' | 'UNLINKED';
+  joinedAt?: string | null;
+  openWorkOrders?: number | null;
+  totalWorkOrders?: number | null;
+  totalPaid?: number | null;
+  recentWorkOrders?: { id: number; code: string; title: string; status: WorkOrderStatus; createdAt: string }[];
+  payments?: Payment[];
 }

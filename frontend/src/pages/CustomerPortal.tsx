@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { customerApi, workOrderApi } from '../services/api';
+import { apiError, customerApi, workOrderApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Customer, Priority, Site, WorkOrder } from '../types';
-import { Building, Clock, MapPin, Plus, Send, X } from 'lucide-react';
+import { Building, Clock, CreditCard, MapPin, Plus, Send, X } from 'lucide-react';
+import { AttachmentsPanel } from '../components/AttachmentsPanel';
+import { Tab } from '../navigation';
 
-export const CustomerPortal: React.FC = () => {
+export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({ onTabChange }) => {
   const { role } = useAuth();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -14,6 +16,7 @@ export const CustomerPortal: React.FC = () => {
   // Modals
   const [showRaise, setShowRaise] = useState(false);
   const [detail, setDetail] = useState<WorkOrder | null>(null);
+  const [formError, setFormError] = useState('');
 
   // Raise request form
   const [title, setTitle] = useState('');
@@ -65,59 +68,68 @@ export const CustomerPortal: React.FC = () => {
       setPriority('MEDIUM');
       fetchPortal();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to raise request');
+      setFormError(apiError(err, 'Failed to raise request'));
     } finally {
       setSaving(false);
     }
   };
 
+  const canPay = (wo: WorkOrder) => role === 'CUSTOMER' && !!onTabChange && (wo.status === 'COMPLETED' || wo.status === 'CLOSED');
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="ks-toolbar">
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Customer Service Portal</h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            {customer ? `${customer.companyName} — raise service requests and track SLA status.` : loading ? 'Raise and track service requests.' : 'Your account is not linked to an organisation yet. Ask your service manager to link it.'}
+          <h2 className="ks-page-title">My Services</h2>
+          <p className="ks-page-sub">
+            {customer ? `${customer.companyName} — raise service requests and track their status.` : loading ? 'Raise and track service requests.' : 'Your account is not linked to an organisation yet. Ask your service manager to link it.'}
           </p>
         </div>
-        <button onClick={() => setShowRaise(true)} className="btn btn-primary" disabled={!customer}>
+        <button onClick={() => { setFormError(''); setShowRaise(true); }} className="btn btn-primary" disabled={!customer}>
           <Plus size={16} /> Raise Service Request
         </button>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>Loading your service requests...</div>
+        <div className="ks-empty">Loading your service requests…</div>
       ) : orders.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>
-          No service requests yet. Raise your first request to get dispatch support.
-        </div>
+        <div className="card ks-empty">No service requests yet. Raise your first request to get dispatch support.</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
           {orders.map((wo) => (
-            <div key={wo.id} className="card" style={{ cursor: 'pointer', borderTop: `4px solid ${wo.slaBreached ? '#ef4444' : '#4f46e5'}` }} onClick={() => setDetail(wo)}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontWeight: 800, color: '#4f46e5', fontSize: '0.85rem' }}>{wo.code}</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <span className={`badge badge-${wo.status.toLowerCase()}`}>{wo.status}</span>
+            <div
+              key={wo.id}
+              className="card"
+              style={{ cursor: 'pointer', borderTop: `4px solid ${wo.slaBreached ? '#ef4444' : '#6366f1'}` }}
+              onClick={() => setDetail(wo)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && setDetail(wo)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 6 }}>
+                <span className="ks-code">{wo.code}</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <span className={`badge badge-${wo.status.toLowerCase()}`}>{wo.status.replace('_', ' ')}</span>
                   <span className={`badge badge-${wo.priority.toLowerCase()}`}>{wo.priority}</span>
                 </div>
               </div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 6 }}>{wo.title}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', color: '#64748b', marginBottom: 8 }}>
-                <MapPin size={12} />
-                <span>{wo.siteName}</span>
+              <div className="ks-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', marginBottom: 8 }}>
+                <MapPin size={12} /> <span>{wo.siteName}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', color: wo.slaBreached ? '#ef4444' : '#64748b' }}>
-                {wo.slaBreached ? <Clock size={12} color="#ef4444" /> : <Clock size={12} />}
-                <span>
-                  {wo.slaBreached
-                    ? 'SLA Breached'
-                    : `SLA Due: ${new Date(wo.slaDueDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
-                </span>
+              <div className={wo.slaBreached ? 'ks-danger-text' : 'ks-muted'} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem' }}>
+                <Clock size={12} />
+                <span>{wo.slaBreached ? 'SLA Breached' : `Target: ${new Date(wo.slaDueDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}</span>
               </div>
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
-                <span>Assigned: <strong>{wo.assignedToName || 'Pending dispatch'}</strong></span>
-                <span>{new Date(wo.createdAt).toLocaleDateString()}</span>
+              <div className="ks-muted" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--ks-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: '0.8rem' }}>
+                <span>Technician: <strong className="ks-text">{wo.assignedToName || 'Pending dispatch'}</strong></span>
+                {canPay(wo) ? (
+                  <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); onTabChange?.('mypayments'); }}>
+                    <CreditCard size={13} /> Pay now
+                  </button>
+                ) : (
+                  <span>{new Date(wo.createdAt).toLocaleDateString()}</span>
+                )}
               </div>
             </div>
           ))}
@@ -128,25 +140,21 @@ export const CustomerPortal: React.FC = () => {
       {showRaise && (
         <div className="modal-backdrop">
           <div className="modal-content" style={{ maxWidth: 520 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Raise Service Request</h3>
-              <button onClick={() => setShowRaise(false)}><X size={20} /></button>
+            <div className="modal-header">
+              <h3>Raise Service Request</h3>
+              <button className="ks-icon-btn" onClick={() => setShowRaise(false)} aria-label="Close"><X size={20} /></button>
             </div>
+            {formError && <div className="ks-alert ks-alert-error">{formError}</div>}
 
-            <form onSubmit={handleRaiseRequest} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '10px 12px', borderRadius: 8, fontSize: '0.85rem', color: '#475569' }}>
-                <Building size={16} color="#4f46e5" />
-                <strong>{customer?.companyName || 'Apex Commercial Towers'}</strong>
+            <form onSubmit={handleRaiseRequest} className="ks-form">
+              <div className="ks-inset" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                <Building size={16} className="ks-accent" />
+                <strong>{customer?.companyName}</strong>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>Facility Site *</label>
-                <select
-                  value={siteId}
-                  onChange={(e) => setSiteId(Number(e.target.value))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                >
+                <label className="ks-label">Facility Site *</label>
+                <select value={siteId} onChange={(e) => setSiteId(Number(e.target.value))} required>
                   <option value="">Select site...</option>
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>{s.siteName} ({s.buildingName || s.address})</option>
@@ -155,23 +163,13 @@ export const CustomerPortal: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>Issue Title *</label>
-                <input
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. HVAC not cooling floor 3"
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                />
+                <label className="ks-label">Issue Title *</label>
+                <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. HVAC not cooling floor 3" />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>Priority (Sets SLA Target)</label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as Priority)}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                >
+                <label className="ks-label">Priority (Sets SLA Target)</label>
+                <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
                   <option value="LOW">LOW (72 Hours SLA)</option>
                   <option value="MEDIUM">MEDIUM (48 Hours SLA)</option>
                   <option value="HIGH">HIGH (24 Hours SLA)</option>
@@ -180,17 +178,11 @@ export const CustomerPortal: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>Description</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Describe the issue and location details..."
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                />
+                <label className="ks-label">Description</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the issue and location details..." />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+              <div className="modal-actions">
                 <button type="button" onClick={() => setShowRaise(false)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   <Send size={14} /> {saving ? 'Submitting...' : 'Submit Request'}
@@ -205,45 +197,50 @@ export const CustomerPortal: React.FC = () => {
       {detail && (
         <div className="modal-backdrop">
           <div className="modal-content" style={{ maxWidth: 620 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div className="modal-header">
               <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4f46e5' }}>{detail.code}</span>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '2px 0 0 0' }}>{detail.title}</h3>
+                <span className="ks-code">{detail.code}</span>
+                <h3 style={{ marginTop: 2 }}>{detail.title}</h3>
               </div>
-              <button onClick={() => setDetail(null)}><X size={20} /></button>
+              <button className="ks-icon-btn" onClick={() => setDetail(null)} aria-label="Close"><X size={20} /></button>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-              <span className={`badge badge-${detail.status.toLowerCase()}`}>{detail.status}</span>
+              <span className={`badge badge-${detail.status.toLowerCase()}`}>{detail.status.replace('_', ' ')}</span>
               <span className={`badge badge-${detail.priority.toLowerCase()}`}>{detail.priority} Priority</span>
               {detail.slaBreached && <span className="badge badge-cancelled">SLA Breached</span>}
             </div>
 
-            <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, fontSize: '0.85rem', marginBottom: 16 }}>
-              <p style={{ margin: '0 0 6px 0' }}><strong>Site:</strong> {detail.siteName} ({detail.siteAddress})</p>
-              <p style={{ margin: '0 0 6px 0' }}><strong>Assigned To:</strong> {detail.assignedToName || 'Pending dispatch'}</p>
-              <p style={{ margin: '0 0 6px 0' }}><strong>SLA Target:</strong> {new Date(detail.slaDueDate).toLocaleString()}</p>
-              {detail.description && <p style={{ margin: '8px 0 0 0', color: '#475569' }}>{detail.description}</p>}
+            <div className="ks-inset" style={{ fontSize: '0.86rem', marginBottom: 16, display: 'grid', gap: 6 }}>
+              <div><strong>Site:</strong> {detail.siteName} ({detail.siteAddress})</div>
+              <div><strong>Technician:</strong> {detail.assignedToName || 'Pending dispatch'}</div>
+              <div><strong>Target:</strong> {new Date(detail.slaDueDate).toLocaleString()}</div>
+              {detail.description && <div className="ks-muted">{detail.description}</div>}
             </div>
 
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 10 }}>Status History</h4>
+            <h4 className="ks-section-title">Status History</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
               {detail.statusHistory && detail.statusHistory.length > 0 ? (
                 detail.statusHistory.map((h) => (
-                  <div key={h.id} style={{ fontSize: '0.8rem', padding: '8px 12px', background: '#f8fafc', borderLeft: '3px solid #4f46e5', borderRadius: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                      <span><strong>{h.fromStatus || 'START'}</strong> ➔ <strong>{h.toStatus}</strong> by {h.changedByName || h.changedByEmail || 'SYSTEM'}</span>
+                  <div key={h.id} className="ks-inset" style={{ fontSize: '0.8rem', padding: '8px 12px', borderLeft: '3px solid var(--ks-accent)' }}>
+                    <div className="ks-muted" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      <span><strong className="ks-text">{h.fromStatus || 'START'}</strong> ➔ <strong className="ks-text">{h.toStatus}</strong> by {h.changedByName || 'SYSTEM'}</span>
                       <span>{new Date(h.changedAt).toLocaleString()}</span>
                     </div>
-                    {h.notes && <p style={{ margin: '4px 0 0 0', color: '#334155' }}>{h.notes}</p>}
+                    {h.notes && <p style={{ margin: '4px 0 0 0' }}>{h.notes}</p>}
                   </div>
                 ))
               ) : (
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No status history available.</div>
+                <div className="ks-dim" style={{ fontSize: '0.8rem' }}>No status history available.</div>
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+            <AttachmentsPanel workOrderId={detail.id} />
+
+            <div className="modal-actions">
+              {canPay(detail) && (
+                <button className="btn btn-primary" onClick={() => { setDetail(null); onTabChange?.('mypayments'); }}><CreditCard size={15} /> Pay for this service</button>
+              )}
               <button onClick={() => setDetail(null)} className="btn btn-secondary">Close</button>
             </div>
           </div>

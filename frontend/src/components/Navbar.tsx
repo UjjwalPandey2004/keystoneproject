@@ -1,7 +1,11 @@
-import React from 'react';
-import { LogOut } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { KeystoneLogo } from './KeystoneLogo';
+import { NotificationItem, tabForNotification } from './NotificationItem';
+import { notificationApi } from '../services/api';
+import { AppNotification } from '../types';
 import { Tab } from '../navigation';
 
 interface NavbarProps {
@@ -12,15 +16,58 @@ export const initials = (name?: string) =>
   (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
 
 export const Navbar: React.FC<NavbarProps> = ({ onTabChange }) => {
-  const { user, role, viewRole, logout, login, demoMode } = useAuth();
+  const { viewRole } = useAuth();
+  const { unread, refreshUnread } = useNotifications();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
 
-  const handleQuickSwitch = async (email: string) => {
-    try {
-      await login(email, 'password');
-      onTabChange('home');
-    } catch (err) {
-      console.error('Quick switch failed', err);
+  // Close the dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (anchor.current && !anchor.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const toggleBell = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      setLoading(true);
+      try {
+        setItems(await notificationApi.list(8));
+      } finally {
+        setLoading(false);
+      }
     }
+  };
+
+  const openNotification = async (n: AppNotification) => {
+    if (!n.read) {
+      await notificationApi.markRead(n.id).catch(() => undefined);
+      setItems((list) => list.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      refreshUnread();
+    }
+    const tab = tabForNotification(viewRole, n);
+    if (tab) {
+      setOpen(false);
+      onTabChange(tab);
+    }
+  };
+
+  const markAll = async () => {
+    await notificationApi.markAllRead();
+    setItems((list) => list.map((x) => ({ ...x, read: true })));
+    refreshUnread();
   };
 
   return (
@@ -34,26 +81,41 @@ export const Navbar: React.FC<NavbarProps> = ({ onTabChange }) => {
       </div>
 
       <div className="ks-topbar-actions">
-        {demoMode && (
-          <div className="ks-demo">
-            <span>Demo:</span>
-            <button onClick={() => handleQuickSwitch('admin@meridian.com')}>Manager</button>
-            <button onClick={() => handleQuickSwitch('dispatcher@meridian.com')}>Dispatch</button>
-            <button onClick={() => handleQuickSwitch('tech@meridian.com')}>Tech</button>
-            <button onClick={() => handleQuickSwitch('customer@meridian.com')}>Customer</button>
-          </div>
-        )}
+        <div className="ks-dropdown-anchor" ref={anchor}>
+          <button
+            className="ks-round-btn"
+            onClick={toggleBell}
+            aria-label={`Notifications, ${unread} unread`}
+            aria-expanded={open}
+            title="Notifications"
+          >
+            <Bell size={17} />
+            {unread > 0 && <span className="ks-bell-count">{unread > 99 ? '99+' : unread}</span>}
+          </button>
+          {open && (
+            <div className="ks-dropdown" role="dialog" aria-label="Notifications">
+              <div className="ks-dropdown-head">
+                <span>Notifications {unread > 0 && <span className="ks-dim" style={{ fontWeight: 500 }}>({unread} unread)</span>}</span>
+                {unread > 0 && <button className="ks-link-btn" onClick={markAll}>Mark all read</button>}
+              </div>
+              <div className="ks-dropdown-list">
+                {loading ? (
+                  <div className="ks-empty">Loading…</div>
+                ) : items.length === 0 ? (
+                  <div className="ks-empty">You're all caught up.</div>
+                ) : (
+                  items.map((n) => <NotificationItem key={n.id} notification={n} onOpen={openNotification} />)
+                )}
+              </div>
+              <div className="ks-dropdown-foot">
+                <button className="ks-link-btn" onClick={() => { setOpen(false); onTabChange('notifications'); }}>
+                  View all notifications
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
-        <button className="ks-user-chip" onClick={() => onTabChange('profile')} title="View profile">
-          <span className="ks-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{initials(user?.userName)}</span>
-          <span style={{ fontWeight: 600 }}>{user?.userName}</span>
-          <span className="ks-role-tag">{role}</span>
-          {viewRole !== role && <span className="ks-role-tag" title="Manager preview of another role">Viewing as {viewRole}</span>}
-        </button>
-
-        <button className="ks-btn ks-btn-gradient" onClick={logout}>
-          <LogOut size={15} /> Logout
-        </button>
       </div>
     </header>
   );

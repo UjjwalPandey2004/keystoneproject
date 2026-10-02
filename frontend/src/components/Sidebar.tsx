@@ -1,8 +1,11 @@
 import React from 'react';
-import { Eye, LogOut } from 'lucide-react';
+import { Eye, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
 import { navForRole, Tab } from '../navigation';
 import { Role } from '../types';
+import { initials } from './Navbar';
 
 interface SidebarProps {
   currentTab: Tab;
@@ -12,10 +15,20 @@ interface SidebarProps {
 const VIEW_ROLES: Role[] = ['MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => {
-  const { role, viewRole, setViewAs, logout } = useAuth();
+  const { user, role, viewRole, setViewAs, logout } = useAuth();
+  const { unread } = useNotifications();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <nav className="ks-sidebar" aria-label="Main navigation">
+      <button className={`ks-side-user ${currentTab === 'profile' ? 'active' : ''}`} onClick={() => onTabChange('profile')} title="View profile">
+        <span className="ks-avatar" style={{ width: 38, height: 38, fontSize: 14 }}>{initials(user?.userName)}</span>
+        <span style={{ minWidth: 0, textAlign: 'left' }}>
+          <span className="ks-side-user-name">{user?.userName}</span>
+          <span className="ks-side-user-role">{role}{viewRole !== role ? ` · viewing as ${viewRole}` : ''}</span>
+        </span>
+      </button>
+
       {/* Only a signed-in manager can preview other roles' screens. */}
       {role === 'MANAGER' && (
         <div className="ks-view-as">
@@ -46,10 +59,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
         >
           {entry.icon}
           <span>{entry.label}</span>
+          {entry.tab === 'notifications' && unread > 0 && <span className="ks-nav-badge">{unread > 99 ? '99+' : unread}</span>}
         </button>
       ))}
 
       <div className="ks-sidebar-footer">
+        <button className="ks-nav-item" onClick={toggleTheme} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+          {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
         <button className="ks-nav-item ks-nav-logout" onClick={logout}>
           <LogOut size={18} />
           <span>Logout</span>

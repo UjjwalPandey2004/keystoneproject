@@ -11,6 +11,15 @@ import { CustomerSites } from './pages/CustomerSites';
 import { TechnicianFieldView } from './pages/TechnicianFieldView';
 import { CustomerPortal } from './pages/CustomerPortal';
 import { UserManagement } from './pages/UserManagement';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { DeliveriesPage } from './pages/DeliveriesPage';
+import { TechniciansPage } from './pages/TechniciansPage';
+import { MyTasksPage } from './pages/MyTasksPage';
+import { PaymentsPage } from './pages/PaymentsPage';
+import { MyPaymentsPage } from './pages/MyPaymentsPage';
+import { CustomersPage } from './pages/CustomersPage';
+import { StaffPage } from './pages/StaffPage';
+import { AttendancePage } from './pages/AttendancePage';
 import { isTabAllowed, Tab, tabFromHash } from './navigation';
 
 export type { Tab } from './navigation';
@@ -51,15 +60,24 @@ const App: React.FC = () => {
       <div className="ks-body">
         <Sidebar currentTab={tab} onTabChange={goTo} />
         <main className="ks-content">
-          <div className="ks-content-inner">
+          <div className="ks-content-inner" key={`${viewRole}-${tab}`}>
             {tab === 'home' && <HomeDashboard onTabChange={goTo} />}
             {tab === 'profile' && <ProfilePage />}
             {tab === 'reports' && <ManagerDashboard />}
             {tab === 'board' && <DispatcherBoard />}
-            {tab === 'customers' && <CustomerSites />}
+            {/* Managers get customer accounts + organisations; dispatchers keep organisations & sites only. */}
+            {tab === 'customers' && (viewRole === 'MANAGER' ? <CustomersPage /> : <CustomerSites />)}
+            {tab === 'staff' && <StaffPage />}
+            {tab === 'attendance' && <AttendancePage />}
             {tab === 'field' && <TechnicianFieldView />}
-            {tab === 'customer' && <CustomerPortal />}
+            {tab === 'customer' && <CustomerPortal onTabChange={goTo} />}
             {tab === 'users' && <UserManagement />}
+            {tab === 'notifications' && <NotificationsPage onTabChange={goTo} />}
+            {tab === 'deliveries' && <DeliveriesPage />}
+            {tab === 'technicians' && <TechniciansPage />}
+            {tab === 'tasks' && <MyTasksPage onTabChange={goTo} />}
+            {tab === 'payments' && <PaymentsPage />}
+            {tab === 'mypayments' && <MyPaymentsPage />}
           </div>
         </main>
       </div>
