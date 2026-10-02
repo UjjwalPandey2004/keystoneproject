@@ -51,7 +51,11 @@ if (-not (Test-Port 8080)) {
     $env:DB_PASSWORD = $dbPassword
     $env:JWT_SECRET = $vars['JWT_SECRET']
     $env:DEMO_MODE = if ($vars['DEMO_MODE']) { $vars['DEMO_MODE'] } else { 'false' }
-    $env:MAIL_ENABLED = 'false'
+    $env:MAIL_ENABLED = if ($vars['MAIL_ENABLED']) { $vars['MAIL_ENABLED'] } else { 'false' }
+    foreach ($name in 'MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'UPI_VPA', 'UPI_PAYEE_NAME') {
+        if ($vars[$name]) { Set-Item "env:$name" $vars[$name] }
+    }
+    $env:STORAGE_DIR = Join-Path $data 'uploads'
     Write-Host 'Starting backend on 8080 (takes 1-2 minutes)...'
     Start-Process -FilePath java -WorkingDirectory $root -WindowStyle Hidden `
         -ArgumentList '-Xmx384m', "-Djava.io.tmpdir=$data\tmp", '-jar', "`"$jar`"" `

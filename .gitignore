@@ -36,3 +36,7 @@ build/
 .env
 data/
 run.log
+
+### JVM crash dumps ###
+hs_err_pid*.log
+replay_pid*.log
