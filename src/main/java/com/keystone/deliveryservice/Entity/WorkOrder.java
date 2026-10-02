@@ -50,6 +50,10 @@ public class WorkOrder {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    // On-site notes kept by the assigned technician.
+    @Column(name = "technician_notes", columnDefinition = "TEXT")
+    private String technicianNotes;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private Priority priority;

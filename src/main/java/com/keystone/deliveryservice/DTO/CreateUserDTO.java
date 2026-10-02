@@ -27,4 +27,8 @@ public class CreateUserDTO {
 
     // Organisation to link a CUSTOMER user to; ignored for staff roles.
     private Long customerId;
+
+    // Base location of a TECHNICIAN; ignored for other roles.
+    @Size(max = 150)
+    private String location;
 }

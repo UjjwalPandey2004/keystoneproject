@@ -41,6 +41,8 @@ public class WorkOrderResponseDTO {
     private Long assignedToId;
     private String assignedToName;
     private String assignedToEmail;
+    private String assignedToLocation;
+    private String technicianNotes;
 
     // Cost & labor totals
     private Double totalPartsCost;

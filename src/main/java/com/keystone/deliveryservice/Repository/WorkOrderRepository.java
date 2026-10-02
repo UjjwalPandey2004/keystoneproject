@@ -1,6 +1,7 @@
 package com.keystone.deliveryservice.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,9 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             "AND w.status NOT IN ('CLOSED', 'CANCELLED') AND w.slaDueDate > :now AND w.slaDueDate <= :latest")
     List<WorkOrder> findPotentiallyAtRiskWorkOrders(@Param("now") LocalDateTime now,
             @Param("latest") LocalDateTime latest);
+
+    // Open jobs per technician, for the assignment picker.
+    long countByAssignedToIdAndStatusIn(Long technicianId, Collection<WorkOrderStatus> statuses);
 
     // Dashboard metrics
     long countByStatus(WorkOrderStatus status);

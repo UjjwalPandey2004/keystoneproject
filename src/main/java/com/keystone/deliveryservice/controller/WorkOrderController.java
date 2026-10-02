@@ -23,6 +23,7 @@ import com.keystone.deliveryservice.DTO.CreateWorkOrderDTO;
 import com.keystone.deliveryservice.DTO.LogPartsDTO;
 import com.keystone.deliveryservice.DTO.LogTimeDTO;
 import com.keystone.deliveryservice.DTO.PartUsageDTO;
+import com.keystone.deliveryservice.DTO.TechnicianNotesDTO;
 import com.keystone.deliveryservice.DTO.TimeLogDTO;
 import com.keystone.deliveryservice.DTO.TransitionStatusDTO;
 import com.keystone.deliveryservice.DTO.UpdateWorkOrderDTO;
@@ -135,6 +136,17 @@ public class WorkOrderController {
         UserAuth user = getCurrentUser(auth);
         PartUsageDTO usage = workOrderService.logParts(id, dto, user);
         return new ResponseEntity<>(usage, HttpStatus.CREATED);
+    }
+
+    @Operation(summary = "Update the technician's on-site notes (assigned Technician / Manager)")
+    @PutMapping("/{id}/technician-notes")
+    @PreAuthorize("hasAnyRole('TECHNICIAN', 'MANAGER')")
+    public ResponseEntity<WorkOrderResponseDTO> updateTechnicianNotes(
+            @PathVariable Long id,
+            @Valid @RequestBody TechnicianNotesDTO dto,
+            Authentication auth) {
+        UserAuth user = getCurrentUser(auth);
+        return ResponseEntity.ok(workOrderService.updateTechnicianNotes(id, dto.getNotes(), user));
     }
 
     @Operation(summary = "Log labor time spent on a job (Technician / Manager)")

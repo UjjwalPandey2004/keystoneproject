@@ -50,6 +50,33 @@ public class EmailLogService {
         javaMailSender.send(message);
     }
     
+    public void sendVerificationCode(String to, String name, String code, long validMinutes) {
+        String subject = "Your KEYSTONE verification code";
+        if (!mailEnabled) {
+            // The code is deliberately left out of the log.
+            emailLogRepo.save(new EmailLog(to, subject,
+                    "Verification code requested. Email delivery is disabled in this environment.", false));
+            return;
+        }
+        boolean sent = false;
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText("Hello " + name + ",\n\n"
+                    + "Your KEYSTONE verification code is: " + code + "\n\n"
+                    + "It expires in " + validMinutes + " minutes and can be used once. "
+                    + "If you did not create a KEYSTONE account, you can ignore this email.\n\n"
+                    + "KEYSTONE - Field Service Management Platform");
+            javaMailSender.send(message);
+            sent = true;
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Could not send the verification email right now. Please try again later.");
+        } finally {
+            emailLogRepo.save(new EmailLog(to, subject, "Verification code email" + (sent ? " sent." : " failed."), sent));
+        }
+    }
+
     public String notification(EmailLogDTO email) {
     	
     	boolean sendStatus=false;

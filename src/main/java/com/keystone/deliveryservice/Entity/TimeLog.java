@@ -1,6 +1,8 @@
 package com.keystone.deliveryservice.Entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -48,6 +50,16 @@ public class TimeLog {
 
     @Column(name = "logged_at", nullable = false)
     private LocalDateTime loggedAt;
+
+    // Optional detail: when the work was actually done.
+    @Column(name = "work_date")
+    private LocalDate workDate;
+
+    @Column(name = "start_time")
+    private LocalTime startTime;
+
+    @Column(name = "end_time")
+    private LocalTime endTime;
 
     @PrePersist
     protected void onCreate() {

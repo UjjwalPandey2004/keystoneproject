@@ -73,15 +73,26 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint()))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(authenticationEntryPoint())
+                // Write the 403 directly: forwarding to /error would lose the JWT context and turn it into a 401.
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.getWriter().write("{\"timestamp\":\"" + java.time.Instant.now()
+                            + "\",\"status\":403,\"error\":\"Forbidden\",\"message\":\"You do not have permission to access this resource\"}");
+                }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/auth/**",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
+                    "/actuator/health",
                     "/actuator/health/**"
                 ).permitAll()
+                // Monitoring data is for managers only.
+                .requestMatchers("/actuator/**").hasRole("MANAGER")
                 .anyRequest().authenticated()
             );
 

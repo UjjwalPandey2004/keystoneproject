@@ -1,12 +1,17 @@
 package com.keystone.deliveryservice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.keystone.deliveryservice.DTO.ChangePasswordDTO;
 import com.keystone.deliveryservice.DTO.LogPartsDTO;
+import com.keystone.deliveryservice.DTO.LoginRequestDTO;
 import com.keystone.deliveryservice.DTO.LogTimeDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
 import com.keystone.deliveryservice.DTO.TransitionStatusDTO;
@@ -40,9 +46,12 @@ import com.keystone.deliveryservice.Repository.TimeLogRepository;
 import com.keystone.deliveryservice.Repository.UserAuthRepository;
 import com.keystone.deliveryservice.Repository.WorkOrderRepository;
 import com.keystone.deliveryservice.Repository.WorkOrderStatusHistoryRepository;
+import com.keystone.deliveryservice.Security.EmailNotVerifiedException;
 import com.keystone.deliveryservice.Security.JWTUtil;
 import com.keystone.deliveryservice.Security.TokenKillingService;
 import com.keystone.deliveryservice.Service.EmailLogService;
+import com.keystone.deliveryservice.Service.EmailVerificationService;
+import com.keystone.deliveryservice.Service.NotificationService;
 import com.keystone.deliveryservice.Service.ResourceAuthorizationService;
 import com.keystone.deliveryservice.Service.UserAuthService;
 import com.keystone.deliveryservice.Service.WorkOrderServiceImpl;
@@ -62,12 +71,14 @@ class SecurityRegressionTests {
     @Mock private PartRepository partRepository;
     @Mock private PartUsageRepository partUsageRepository;
     @Mock private TimeLogRepository timeLogRepository;
+    @Mock private EmailVerificationService emailVerificationService;
+    @Mock private NotificationService notificationService;
 
     @InjectMocks private UserAuthService userAuthService;
     @InjectMocks private WorkOrderServiceImpl workOrderService;
 
     @Test
-    void anonymousRegistrationAlwaysCreatesCustomerRole() {
+    void anonymousRegistrationCreatesUnverifiedCustomerWithoutToken() {
         RegisterRequestDTO request = RegisterRequestDTO.builder()
                 .userName("New Customer")
                 .userEmail("new@example.com")
@@ -78,13 +89,42 @@ class SecurityRegressionTests {
         when(userRepository.existsByUserEmail(request.getUserEmail())).thenReturn(false);
         when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded");
         when(userRepository.save(any(UserAuth.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtUtil.generateToken(any(UserAuth.class))).thenReturn("signed-token");
 
-        assertEquals(Role.CUSTOMER, userAuthService.register(request).getRole());
+        var response = userAuthService.register(request);
+        assertEquals(Role.CUSTOMER, response.getRole());
+        // No session until the email is verified.
+        assertNull(response.getToken());
 
         ArgumentCaptor<UserAuth> savedUser = ArgumentCaptor.forClass(UserAuth.class);
         verify(userRepository).save(savedUser.capture());
         assertEquals(Role.CUSTOMER, savedUser.getValue().getRole());
+        assertFalse(savedUser.getValue().isEmailVerified());
+        verify(emailVerificationService).issueCode(savedUser.getValue());
+        verify(jwtUtil, never()).generateToken(any(UserAuth.class));
+    }
+
+    @Test
+    void unverifiedAccountCannotLogIn() {
+        UserAuth user = UserAuth.builder().id(9L).userEmail("new@example.com").password("hash")
+                .role(Role.CUSTOMER).emailVerified(false).build();
+        when(userRepository.findByUserEmail("new@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secure-password", "hash")).thenReturn(true);
+
+        assertThrows(EmailNotVerifiedException.class, () -> userAuthService.login(
+                LoginRequestDTO.builder().userEmail("new@example.com").password("secure-password").build()));
+        verify(jwtUtil, never()).generateToken(any(UserAuth.class));
+    }
+
+    @Test
+    void timeLogDurationComesFromStartAndEndTime() {
+        LogTimeDTO dto = LogTimeDTO.builder().startTime(LocalTime.of(9, 15)).endTime(LocalTime.of(11, 0)).minutes(5).build();
+        assertEquals(105, WorkOrderServiceImpl.resolveLoggedMinutes(dto));
+
+        assertThrows(IllegalArgumentException.class, () -> WorkOrderServiceImpl.resolveLoggedMinutes(
+                LogTimeDTO.builder().startTime(LocalTime.of(11, 0)).endTime(LocalTime.of(9, 0)).build()));
+        assertThrows(IllegalArgumentException.class, () -> WorkOrderServiceImpl.resolveLoggedMinutes(
+                LogTimeDTO.builder().workDate(LocalDate.now().plusDays(1)).minutes(30).build()));
+        assertThrows(IllegalArgumentException.class, () -> WorkOrderServiceImpl.resolveLoggedMinutes(new LogTimeDTO()));
     }
 
     @Test
@@ -246,6 +286,8 @@ class SecurityRegressionTests {
                         .newPassword("new-password-1").confirmPassword("new-password-1").build());
 
         assertEquals("new-hash", manager.getPassword());
+        // Recorded so tokens issued before the change are rejected.
+        assertNotNull(manager.getPasswordChangedAt());
         verify(userRepository).save(manager);
     }
 }

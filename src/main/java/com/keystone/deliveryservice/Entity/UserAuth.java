@@ -1,5 +1,6 @@
 package com.keystone.deliveryservice.Entity;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 //import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,39 @@ public class UserAuth {
 
 	private String resettoken;
 	private Date tokenExpireTime;
+
+	// Self-registered accounts must confirm their email with a one-time code before signing in.
+	@Builder.Default
+	@Column(nullable=false)
+	private boolean emailVerified = true;
+
+	// BCrypt hash of the pending one-time code; the code itself is never stored.
+	private String otpHash;
+	private LocalDateTime otpExpiresAt;
+	@Builder.Default
+	@Column(nullable=false)
+	private int otpAttempts = 0;
+	private LocalDateTime otpSentAt;
+
+	// JWTs issued before this moment are no longer accepted.
+	private LocalDateTime passwordChangedAt;
+
+	// When the account was created; null for accounts that existed before this was recorded.
+	@Column(name="created_at", updatable=false)
+	private LocalDateTime createdAt;
+
+	@PrePersist
+	protected void onCreate() {
+		if (createdAt == null) {
+			createdAt = LocalDateTime.now();
+		}
+	}
+
+	// Technician dispatch details.
+	private String location;
+	@Builder.Default
+	@Column(nullable=false)
+	private boolean available = true;
 
 	public boolean isLinkedTo(long organisationId) {
 		return customerId != null && customerId == organisationId;

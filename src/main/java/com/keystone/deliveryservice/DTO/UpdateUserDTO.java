@@ -21,6 +21,12 @@ public class UpdateUserDTO {
     // Organisation to link a CUSTOMER user to; ignored for staff roles.
     private Long customerId;
 
+    // TECHNICIAN only: base location and whether they can take new jobs.
+    @Size(max = 150)
+    private String location;
+
+    private Boolean available;
+
     // Optional: set a new password for the user.
     @Size(min = 8, max = 100)
     private String password;

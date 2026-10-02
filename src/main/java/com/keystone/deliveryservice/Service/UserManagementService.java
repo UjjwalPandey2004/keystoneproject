@@ -1,5 +1,7 @@
 package com.keystone.deliveryservice.Service;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -12,9 +14,11 @@ import com.keystone.deliveryservice.DTO.CreateUserDTO;
 import com.keystone.deliveryservice.DTO.UpdateUserDTO;
 import com.keystone.deliveryservice.DTO.UserResponseDTO;
 import com.keystone.deliveryservice.ENUM.Role;
+import com.keystone.deliveryservice.ENUM.WorkOrderStatus;
 import com.keystone.deliveryservice.Entity.UserAuth;
 import com.keystone.deliveryservice.Repository.CustomerRepository;
 import com.keystone.deliveryservice.Repository.UserAuthRepository;
+import com.keystone.deliveryservice.Repository.WorkOrderRepository;
 
 @Service
 @Transactional
@@ -22,12 +26,14 @@ public class UserManagementService {
     private final UserAuthRepository userRepository;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WorkOrderRepository workOrderRepository;
 
     public UserManagementService(UserAuthRepository userRepository, CustomerRepository customerRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder, WorkOrderRepository workOrderRepository) {
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.workOrderRepository = workOrderRepository;
     }
 
     @Transactional(readOnly = true)
@@ -35,9 +41,23 @@ public class UserManagementService {
         return userRepository.findAll(pageable).map(this::toResponse);
     }
 
+    // Statuses that count as a technician's current workload.
+    private static final List<WorkOrderStatus> OPEN_JOB_STATUSES =
+            List.of(WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.ON_HOLD);
+
+    /** Technicians with their location, availability and current number of open jobs. */
     @Transactional(readOnly = true)
     public List<UserResponseDTO> listTechnicians() {
-        return userRepository.findByRole(Role.TECHNICIAN).stream().map(this::toResponse).toList();
+        return userRepository.findByRole(Role.TECHNICIAN).stream()
+                .map(technician -> {
+                    UserResponseDTO dto = toResponse(technician);
+                    dto.setCurrentJobs(workOrderRepository.countByAssignedToIdAndStatusIn(technician.getId(), OPEN_JOB_STATUSES));
+                    return dto;
+                })
+                .sorted(Comparator.comparing((UserResponseDTO t) -> !Boolean.TRUE.equals(t.getAvailable()))
+                        .thenComparing(UserResponseDTO::getCurrentJobs)
+                        .thenComparing(UserResponseDTO::getUserName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     public UserResponseDTO create(CreateUserDTO request) {
@@ -52,6 +72,10 @@ public class UserManagementService {
                 .phone(request.getPhone())
                 .role(request.getRole())
                 .customerId(resolveCustomerId(request.getRole(), request.getCustomerId()))
+                // Created by a manager, so the address does not need self-verification.
+                .emailVerified(true)
+                .location(request.getRole() == Role.TECHNICIAN ? blankToNull(request.getLocation()) : null)
+                .available(true)
                 .build();
         return toResponse(userRepository.save(user));
     }
@@ -63,8 +87,18 @@ public class UserManagementService {
         user.setPhone(request.getPhone());
         user.setRole(request.getRole());
         user.setCustomerId(resolveCustomerId(request.getRole(), request.getCustomerId()));
+        if (request.getRole() == Role.TECHNICIAN) {
+            if (request.getLocation() != null) {
+                user.setLocation(blankToNull(request.getLocation()));
+            }
+            if (request.getAvailable() != null) {
+                user.setAvailable(request.getAvailable());
+            }
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+            // A manager-set password signs the user out everywhere.
+            user.setPasswordChangedAt(LocalDateTime.now());
         }
         return toResponse(userRepository.save(user));
     }
@@ -81,13 +115,10 @@ public class UserManagementService {
     }
 
     private UserResponseDTO toResponse(UserAuth user) {
-        return UserResponseDTO.builder()
-                .id(user.getId())
-                .userName(user.getUserName())
-                .userEmail(user.getUserEmail())
-                .phone(user.getPhone())
-                .role(user.getRole())
-                .customerId(user.getCustomerId())
-                .build();
+        return UserResponseDTO.from(user);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

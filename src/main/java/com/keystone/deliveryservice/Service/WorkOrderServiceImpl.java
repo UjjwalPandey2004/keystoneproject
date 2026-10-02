@@ -1,8 +1,12 @@
 package com.keystone.deliveryservice.Service;
 
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +28,8 @@ import com.keystone.deliveryservice.DTO.TransitionStatusDTO;
 import com.keystone.deliveryservice.DTO.UpdateWorkOrderDTO;
 import com.keystone.deliveryservice.DTO.WorkOrderResponseDTO;
 import com.keystone.deliveryservice.DTO.WorkOrderStatusHistoryDTO;
+import com.keystone.deliveryservice.ENUM.NotificationType;
+import com.keystone.deliveryservice.ENUM.Priority;
 import com.keystone.deliveryservice.ENUM.Role;
 import com.keystone.deliveryservice.ENUM.WorkOrderStatus;
 import com.keystone.deliveryservice.Entity.Customer;
@@ -73,6 +79,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private NotificationService notificationService;
+
+    private static final Set<Role> STAFF = Set.of(Role.MANAGER, Role.DISPATCHER);
 
     @Override
     public WorkOrderResponseDTO createWorkOrder(CreateWorkOrderDTO dto, UserAuth currentUser) {
@@ -133,6 +144,25 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .notes("Work order raised: " + workOrder.getTitle())
                 .build();
         historyRepo.save(initialHistory);
+
+        NotificationService.Ref ref = workOrderRef(workOrder);
+        boolean critical = workOrder.getPriority() == Priority.CRITICAL;
+        notificationService.notifyRoles(STAFF, currentUser,
+                critical ? NotificationType.CRITICAL_WORK_ORDER : NotificationType.WORK_ORDER_CREATED,
+                (critical ? "CRITICAL work order " : "New work order ") + workOrder.getCode(),
+                workOrder.getTitle() + " at " + site.getSiteName() + " (" + customer.getCompanyName() + "). Priority "
+                        + workOrder.getPriority() + ", SLA due " + formatTime(slaDueDate) + ".",
+                ref);
+        notificationService.notifyCustomerOrganisation(customer.getId(), currentUser, NotificationType.WORK_ORDER_CREATED,
+                "Service request received: " + workOrder.getCode(),
+                "We received \"" + workOrder.getTitle() + "\" for " + site.getSiteName() + ". Target completion: "
+                        + formatTime(slaDueDate) + ".",
+                ref);
+        if (assignedTechnician != null) {
+            notificationService.notifyUser(assignedTechnician, NotificationType.WORK_ORDER_ASSIGNED,
+                    "New job assigned: " + workOrder.getCode(),
+                    workOrder.getTitle() + " at " + site.getSiteName() + ", " + site.getAddress() + ".", ref);
+        }
 
         return mapToDTOForUser(workOrder, currentUser);
     }
@@ -266,6 +296,20 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 "You have been assigned " + workOrder.getCode() + " - " + workOrder.getTitle()
                         + ". SLA due: " + workOrder.getSlaDueDate()));
 
+        NotificationService.Ref ref = workOrderRef(workOrder);
+        notificationService.notifyUser(technician, NotificationType.WORK_ORDER_ASSIGNED,
+                "New job assigned: " + workOrder.getCode(),
+                workOrder.getTitle() + " at " + workOrder.getSite().getSiteName() + ", " + workOrder.getSite().getAddress()
+                        + ". SLA due " + formatTime(workOrder.getSlaDueDate()) + ".",
+                ref);
+        notificationService.notifyRoles(STAFF, currentUser, NotificationType.TECHNICIAN_ASSIGNMENT,
+                workOrder.getCode() + " assigned to " + technician.getUserName(),
+                currentUser.getUserName() + " assigned " + workOrder.getTitle() + " to " + technician.getUserName() + ".",
+                ref);
+        notificationService.notifyCustomerOrganisation(workOrder.getCustomer().getId(), currentUser,
+                NotificationType.WORK_ORDER_ASSIGNED, "Technician assigned: " + workOrder.getCode(),
+                technician.getUserName() + " will handle \"" + workOrder.getTitle() + "\".", ref);
+
         return mapToDTO(workOrder);
     }
 
@@ -304,7 +348,60 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
         historyRepo.save(history);
 
+        notifyStatusChange(workOrder, from, to, currentUser);
+
         return mapToDTO(workOrder);
+    }
+
+    private void notifyStatusChange(WorkOrder workOrder, WorkOrderStatus from, WorkOrderStatus to, UserAuth actor) {
+        NotificationService.Ref ref = workOrderRef(workOrder);
+        String label = to.name().replace('_', ' ');
+        boolean completed = to == WorkOrderStatus.COMPLETED;
+        NotificationType type = completed ? NotificationType.WORK_ORDER_COMPLETED : NotificationType.WORK_ORDER_STATUS;
+        String staffTitle = completed
+                ? workOrder.getCode() + " completed"
+                : workOrder.getCode() + " is now " + label;
+        notificationService.notifyRoles(STAFF, actor, type, staffTitle,
+                actor.getUserName() + " moved \"" + workOrder.getTitle() + "\" from " + from.name().replace('_', ' ')
+                        + " to " + label + ".",
+                ref);
+        notificationService.notifyCustomerOrganisation(workOrder.getCustomer().getId(), actor, type,
+                completed ? "Work completed: " + workOrder.getCode() : "Update on " + workOrder.getCode() + ": " + label,
+                completed
+                        ? "\"" + workOrder.getTitle() + "\" has been completed. You can now pay for this service from My Payments."
+                        : "\"" + workOrder.getTitle() + "\" is now " + label + ".",
+                ref);
+        // Tell the technician when someone else changed their job (e.g. a manager closed or cancelled it).
+        if (workOrder.getAssignedTo() != null) {
+            notificationService.notifyUser(
+                    workOrder.getAssignedTo().getId().equals(actor.getId()) ? null : workOrder.getAssignedTo(),
+                    NotificationType.WORK_ORDER_STATUS, workOrder.getCode() + " is now " + label,
+                    actor.getUserName() + " changed \"" + workOrder.getTitle() + "\" to " + label + ".", ref);
+        }
+    }
+
+    @Override
+    public WorkOrderResponseDTO updateTechnicianNotes(Long id, String notes, UserAuth currentUser) {
+        WorkOrder workOrder = workOrderRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Work order not found with ID: " + id));
+        if (currentUser.getRole() != Role.MANAGER
+                && (workOrder.getAssignedTo() == null || !workOrder.getAssignedTo().getId().equals(currentUser.getId()))) {
+            throw new AccessDeniedException("Only the assigned technician can edit the technician notes.");
+        }
+        if (workOrder.getStatus().isTerminal()) {
+            throw new IllegalStateException("Work order is " + workOrder.getStatus() + " and cannot be modified.");
+        }
+        workOrder.setTechnicianNotes(notes == null || notes.isBlank() ? null : notes.trim());
+        workOrder.setUpdatedAt(LocalDateTime.now());
+        return mapToDTO(workOrderRepo.save(workOrder));
+    }
+
+    private static NotificationService.Ref workOrderRef(WorkOrder workOrder) {
+        return new NotificationService.Ref(NotificationService.WORK_ORDER, workOrder.getId(), workOrder.getCode());
+    }
+
+    private static String formatTime(LocalDateTime time) {
+        return time == null ? "-" : time.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"));
     }
 
     @Override
@@ -375,17 +472,22 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             throw new IllegalStateException("Cannot log labor time on a closed/cancelled work order.");
         }
 
+        int minutes = resolveLoggedMinutes(dto);
+
         TimeLog timeLog = TimeLog.builder()
                 .workOrder(workOrder)
                 .technician(currentUser)
-                .minutes(dto.getMinutes())
+                .minutes(minutes)
                 .note(dto.getNote())
                 .loggedAt(LocalDateTime.now())
+                .workDate(dto.getWorkDate() != null ? dto.getWorkDate() : (dto.getStartTime() != null ? LocalDate.now() : null))
+                .startTime(dto.getStartTime())
+                .endTime(dto.getEndTime())
                 .build();
         timeLog = timeLogRepo.save(timeLog);
 
         // Roll up labor minutes onto work order
-        workOrder.setTotalLaborMinutes(workOrder.getTotalLaborMinutes() + dto.getMinutes());
+        workOrder.setTotalLaborMinutes(workOrder.getTotalLaborMinutes() + minutes);
         workOrder.setUpdatedAt(LocalDateTime.now());
         workOrderRepo.save(workOrder);
 
@@ -397,7 +499,30 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .minutes(timeLog.getMinutes())
                 .note(timeLog.getNote())
                 .loggedAt(timeLog.getLoggedAt())
+                .workDate(timeLog.getWorkDate())
+                .startTime(timeLog.getStartTime())
+                .endTime(timeLog.getEndTime())
                 .build();
+    }
+
+    // Start + end time decide the duration; otherwise the minutes field is required.
+    public static int resolveLoggedMinutes(LogTimeDTO dto) {
+        if (dto.getWorkDate() != null && dto.getWorkDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("The work date cannot be in the future.");
+        }
+        if (dto.getStartTime() != null || dto.getEndTime() != null) {
+            if (dto.getStartTime() == null || dto.getEndTime() == null) {
+                throw new IllegalArgumentException("Enter both a start time and an end time.");
+            }
+            if (!dto.getEndTime().isAfter(dto.getStartTime())) {
+                throw new IllegalArgumentException("The end time must be after the start time.");
+            }
+            return (int) Duration.between(dto.getStartTime(), dto.getEndTime()).toMinutes();
+        }
+        if (dto.getMinutes() == null) {
+            throw new IllegalArgumentException("Enter a start and end time, or the minutes worked.");
+        }
+        return dto.getMinutes();
     }
 
     // --- Guarded State Machine Transition Rules (Section 07) ---
@@ -555,6 +680,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .minutes(t.getMinutes())
                         .note(t.getNote())
                         .loggedAt(t.getLoggedAt())
+                        .workDate(t.getWorkDate())
+                        .startTime(t.getStartTime())
+                        .endTime(t.getEndTime())
                         .build())
                 .collect(Collectors.toList());
 
@@ -577,6 +705,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .assignedToId(w.getAssignedTo() != null ? w.getAssignedTo().getId() : null)
                 .assignedToName(w.getAssignedTo() != null ? w.getAssignedTo().getUserName() : null)
                 .assignedToEmail(w.getAssignedTo() != null ? w.getAssignedTo().getUserEmail() : null)
+                .assignedToLocation(w.getAssignedTo() != null ? w.getAssignedTo().getLocation() : null)
+                .technicianNotes(w.getTechnicianNotes())
                 .totalPartsCost(w.getTotalPartsCost())
                 .totalLaborMinutes(w.getTotalLaborMinutes())
                 .createdAt(w.getCreatedAt())
@@ -597,6 +727,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
         response.setCustomerEmail(null);
         response.setAssignedToEmail(null);
+        response.setAssignedToLocation(null);
+        response.setTechnicianNotes(null);
         response.setTotalPartsCost(null);
         response.getStatusHistory().forEach(history -> history.setChangedByEmail(null));
         response.getPartsUsed().forEach(part -> {

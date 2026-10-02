@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,9 +20,13 @@ import com.keystone.deliveryservice.DTO.ChangePasswordDTO;
 import com.keystone.deliveryservice.DTO.ForgotPasswordDTO;
 import com.keystone.deliveryservice.DTO.LoginRequestDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
+import com.keystone.deliveryservice.DTO.ResendOtpDTO;
 import com.keystone.deliveryservice.DTO.ResetPasswordDTO;
+import com.keystone.deliveryservice.DTO.UpdateProfileDTO;
 import com.keystone.deliveryservice.DTO.UserResponseDTO;
+import com.keystone.deliveryservice.DTO.VerifyEmailDTO;
 import com.keystone.deliveryservice.Repository.UserAuthRepository;
+import com.keystone.deliveryservice.Service.EmailVerificationService;
 import com.keystone.deliveryservice.Service.UserAuthService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +45,9 @@ public class UserAuthController {
     @Autowired
     private UserAuthRepository userAuthRepository;
 
+    @Autowired
+    private EmailVerificationService emailVerificationService;
+
     @Value("${app.demo-mode:false}")
     private boolean demoMode;
 
@@ -49,26 +57,47 @@ public class UserAuthController {
         return ResponseEntity.ok(Map.of("demoMode", demoMode));
     }
 
+    private static boolean isSignedIn(Authentication authentication) {
+        // /api/auth/** is public, so anonymous callers must be rejected explicitly.
+        return authentication != null && !(authentication instanceof AnonymousAuthenticationToken)
+                && authentication.isAuthenticated();
+    }
+
     @Operation(summary = "Profile of the signed-in user (validates the JWT)")
     @GetMapping("/me")
     public ResponseEntity<UserResponseDTO> me(Authentication authentication) {
-        // /api/auth/** is public, so an anonymous caller must be rejected here.
-        if (authentication == null || authentication instanceof AnonymousAuthenticationToken
-                || !authentication.isAuthenticated()) {
+        if (!isSignedIn(authentication)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return userAuthRepository.findByUserEmail(authentication.getName())
-                .map(user -> ResponseEntity.ok(UserResponseDTO.builder()
-                        .id(user.getId())
-                        .userName(user.getUserName())
-                        .userEmail(user.getUserEmail())
-                        .phone(user.getPhone())
-                        .role(user.getRole())
-                        .customerId(user.getCustomerId())
-                        .build()))
+                .map(user -> ResponseEntity.ok(UserResponseDTO.from(user)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
+    @Operation(summary = "Update the signed-in user's own name, phone and (technicians) location / availability")
+    @PutMapping("/me")
+    public ResponseEntity<UserResponseDTO> updateMe(Authentication authentication,
+            @Valid @RequestBody UpdateProfileDTO update) {
+        if (!isSignedIn(authentication)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(UserResponseDTO.from(userAuthService.updateOwnProfile(authentication.getName(), update)));
+    }
+
+    @Operation(summary = "Verify a newly registered email address with the emailed 6-digit code")
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@Valid @RequestBody VerifyEmailDTO request) {
+        emailVerificationService.verify(request.getUserEmail(), request.getOtp());
+        return ResponseEntity.ok(Map.of("message", "Email verified. You can now sign in."));
+    }
+
+    @Operation(summary = "Send a new verification code (60 second cooldown)")
+    @PostMapping("/resend-otp")
+    public ResponseEntity<Map<String, String>> resendOtp(@Valid @RequestBody ResendOtpDTO request) {
+        emailVerificationService.resend(request.getUserEmail());
+        return ResponseEntity.ok(Map.of("message",
+                "If this email has an account waiting for verification, a new code has been sent."));
+    }
     @Operation(summary = "Register a new customer account")
     @PostMapping("/register")
     public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO register) {
@@ -100,13 +129,12 @@ public class UserAuthController {
     @PostMapping("/change-password")
     public ResponseEntity<Map<String, String>> changePassword(Authentication authentication,
             @Valid @RequestBody ChangePasswordDTO change) {
-        // /api/auth/** is public, so an anonymous caller must be rejected here.
-        if (authentication == null || authentication instanceof AnonymousAuthenticationToken
-                || !authentication.isAuthenticated()) {
+        if (!isSignedIn(authentication)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        userAuthService.changePassword(authentication.getName(), change);
-        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+        // The old token stops working; the client switches to the token returned here.
+        String token = userAuthService.changePassword(authentication.getName(), change);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully", "token", token));
     }
 
     @Operation(summary = "Invalidate user token (Logout)")

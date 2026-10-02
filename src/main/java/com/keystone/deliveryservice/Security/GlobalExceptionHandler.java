@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.keystone.deliveryservice.DTO.ErrorResponseDTO;
 
@@ -59,6 +60,29 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEmailNotVerified(EmailNotVerifiedException ex, HttpServletRequest request) {
+        // The frontend uses error "EMAIL_NOT_VERIFIED" to open the verification screen.
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(),
+                "EMAIL_NOT_VERIFIED",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleUploadTooLarge(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                "Payload Too Large",
+                "The file is too large. The limit is 10 MB.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

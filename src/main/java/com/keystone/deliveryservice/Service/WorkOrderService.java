@@ -34,4 +34,7 @@ public interface WorkOrderService {
     PartUsageDTO logParts(Long id, LogPartsDTO dto, UserAuth currentUser);
 
     TimeLogDTO logTime(Long id, LogTimeDTO dto, UserAuth currentUser);
+
+    // On-site notes: editable by the assigned technician (and managers).
+    WorkOrderResponseDTO updateTechnicianNotes(Long id, String notes, UserAuth currentUser);
 }
