@@ -25,6 +25,7 @@ import com.keystone.deliveryservice.DTO.SiteRequestDTO;
 import com.keystone.deliveryservice.DTO.SiteResponseDTO;
 import com.keystone.deliveryservice.Entity.Customer;
 import com.keystone.deliveryservice.Entity.Site;
+import com.keystone.deliveryservice.Entity.UserAuth;
 import com.keystone.deliveryservice.Service.CustomerServiceLogic;
 import com.keystone.deliveryservice.Service.ResourceAuthorizationService;
 import com.keystone.deliveryservice.Service.SiteService;
@@ -67,6 +68,17 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.searchCustomers(query, pageable).map(ApiDtoMapper::toCustomerResponse));
     }
 
+    @Operation(summary = "Get the organisation the signed-in customer user is linked to")
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<CustomerResponseDTO> getMyCustomer(Authentication authentication) {
+        UserAuth user = authorizationService.currentUser(authentication);
+        if (user.getCustomerId() == null) {
+            throw new IllegalArgumentException("No customer organisation is linked to this account");
+        }
+        return ResponseEntity.ok(ApiDtoMapper.toCustomerResponse(customerService.getCustomer(user.getCustomerId())));
+    }
+
     @Operation(summary = "Get a customer by ID")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
@@ -96,7 +108,7 @@ public class CustomerController {
             Authentication authentication) {
         authorizationService.requireCustomerAccess(customerService.getCustomer(customerId), authentication);
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
-                Sort.by("SiteName").ascending());
+                Sort.by("siteName").ascending());
         return ResponseEntity.ok(siteService.searchSitesByCustomer(customerId, query, pageable)
                 .map(ApiDtoMapper::toSiteResponse));
     }

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { customerApi, workOrderApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { Customer, Priority, Site, WorkOrder } from '../types';
 import { Building, Clock, MapPin, Plus, Send, X } from 'lucide-react';
 
 export const CustomerPortal: React.FC = () => {
+  const { role } = useAuth();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
@@ -23,13 +25,15 @@ export const CustomerPortal: React.FC = () => {
   const fetchPortal = async () => {
     try {
       setLoading(true);
-      const [woRes, custRes, sitesRes] = await Promise.all([
-        workOrderApi.list({ size: 100 }),
-        customerApi.getById(1),
-        customerApi.getSites(1),
-      ]);
+      const woRes = await workOrderApi.list({ size: 100 });
       setOrders(woRes.content || []);
+
+      // Customers see their own linked organisation; a manager previews the first one.
+      const custRes = role === 'CUSTOMER'
+        ? await customerApi.getMine()
+        : (await customerApi.getAll())[0];
       setCustomer(custRes || null);
+      const sitesRes = custRes ? await customerApi.getSites(custRes.id) : [];
       setSites(sitesRes || []);
       if (sitesRes && sitesRes.length > 0) setSiteId(sitesRes[0].id);
     } catch (err) {
@@ -45,14 +49,14 @@ export const CustomerPortal: React.FC = () => {
 
   const handleRaiseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!siteId) return;
+    if (!siteId || !customer) return;
     setSaving(true);
     try {
       await workOrderApi.create({
         title,
         description,
         priority,
-        customerId: customer ? customer.id : 1,
+        customerId: customer.id,
         siteId: Number(siteId),
       });
       setShowRaise(false);
@@ -73,10 +77,10 @@ export const CustomerPortal: React.FC = () => {
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Customer Service Portal</h2>
           <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            {customer ? `${customer.companyName} — raise service requests and track SLA status.` : 'Raise and track service requests.'}
+            {customer ? `${customer.companyName} — raise service requests and track SLA status.` : loading ? 'Raise and track service requests.' : 'Your account is not linked to an organisation yet. Ask your service manager to link it.'}
           </p>
         </div>
-        <button onClick={() => setShowRaise(true)} className="btn btn-primary">
+        <button onClick={() => setShowRaise(true)} className="btn btn-primary" disabled={!customer}>
           <Plus size={16} /> Raise Service Request
         </button>
       </div>

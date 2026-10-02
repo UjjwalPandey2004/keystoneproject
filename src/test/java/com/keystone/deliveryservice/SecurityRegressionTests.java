@@ -19,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.keystone.deliveryservice.DTO.ChangePasswordDTO;
 import com.keystone.deliveryservice.DTO.LogPartsDTO;
 import com.keystone.deliveryservice.DTO.LogTimeDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
@@ -110,6 +111,37 @@ class SecurityRegressionTests {
     }
 
     @Test
+    void matchingEmailAloneDoesNotGrantOrganizationAccess() {
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        UserAuth selfRegistered = UserAuth.builder()
+                .id(5L)
+                .userEmail("contact@example.com")
+                .role(Role.CUSTOMER)
+                .build();
+        UserAuth linked = UserAuth.builder()
+                .id(6L)
+                .userEmail("someone-else@example.com")
+                .role(Role.CUSTOMER)
+                .customerId(7L)
+                .build();
+        Customer organization = Customer.builder()
+                .id(7L)
+                .email("contact@example.com")
+                .build();
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn(selfRegistered.getUserEmail(), linked.getUserEmail());
+        when(userRepository.findByUserEmail(selfRegistered.getUserEmail())).thenReturn(Optional.of(selfRegistered));
+        when(userRepository.findByUserEmail(linked.getUserEmail())).thenReturn(Optional.of(linked));
+
+        ResourceAuthorizationService authorizationService = new ResourceAuthorizationService(userRepository);
+
+        assertThrows(AccessDeniedException.class,
+                () -> authorizationService.requireCustomerAccess(organization, authentication));
+        authorizationService.requireCustomerAccess(organization, authentication);
+    }
+
+    @Test
     void unassignedTechnicianCannotLogPartsOrTime() {
         UserAuth assignedTechnician = UserAuth.builder().id(3L).role(Role.TECHNICIAN).build();
         UserAuth otherTechnician = UserAuth.builder().id(44L).role(Role.TECHNICIAN).build();
@@ -186,5 +218,34 @@ class SecurityRegressionTests {
 
         assertEquals(WorkOrderStatus.COMPLETED, workOrder.getStatus());
         verify(workOrderRepository, never()).save(any(WorkOrder.class));
+    }
+
+    @Test
+    void changePasswordRejectsWrongCurrentPassword() {
+        UserAuth manager = UserAuth.builder().id(1L).userEmail("admin@example.com").password("stored-hash").role(Role.MANAGER).build();
+        when(userRepository.findByUserEmail("admin@example.com")).thenReturn(Optional.of(manager));
+        when(passwordEncoder.matches("wrong-password", "stored-hash")).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class, () -> userAuthService.changePassword("admin@example.com",
+                ChangePasswordDTO.builder().currentPassword("wrong-password")
+                        .newPassword("new-password-1").confirmPassword("new-password-1").build()));
+
+        assertEquals("stored-hash", manager.getPassword());
+        verify(userRepository, never()).save(any(UserAuth.class));
+    }
+
+    @Test
+    void changePasswordStoresOnlyTheEncodedPassword() {
+        UserAuth manager = UserAuth.builder().id(1L).userEmail("admin@example.com").password("stored-hash").role(Role.MANAGER).build();
+        when(userRepository.findByUserEmail("admin@example.com")).thenReturn(Optional.of(manager));
+        when(passwordEncoder.matches("old-password", "stored-hash")).thenReturn(true);
+        when(passwordEncoder.encode("new-password-1")).thenReturn("new-hash");
+
+        userAuthService.changePassword("admin@example.com",
+                ChangePasswordDTO.builder().currentPassword("old-password")
+                        .newPassword("new-password-1").confirmPassword("new-password-1").build());
+
+        assertEquals("new-hash", manager.getPassword());
+        verify(userRepository).save(manager);
     }
 }

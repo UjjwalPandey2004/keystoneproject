@@ -1,175 +1,58 @@
 import React from 'react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { Shield, Wrench, ClipboardList, BarChart3, Building, LogOut, User as UserIcon, Moon, Sun } from 'lucide-react';
-import { Role } from '../types';
-import { Tab } from '../App';
+import { Tab } from '../navigation';
 
 interface NavbarProps {
-  currentTab: Tab;
   onTabChange: (tab: Tab) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
-  const { user, role, logout, login } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+export const initials = (name?: string) =>
+  (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
 
-  const handleQuickSwitch = async (targetRole: Role, email: string) => {
+export const Navbar: React.FC<NavbarProps> = ({ onTabChange }) => {
+  const { user, role, viewRole, logout, login, demoMode } = useAuth();
+
+  const handleQuickSwitch = async (email: string) => {
     try {
       await login(email, 'password');
-      if (targetRole === 'MANAGER') onTabChange('dashboard');
-      else if (targetRole === 'DISPATCHER') onTabChange('board');
-      else if (targetRole === 'TECHNICIAN') onTabChange('field');
-      else if (targetRole === 'CUSTOMER') onTabChange('customer');
+      onTabChange('home');
     } catch (err) {
       console.error('Quick switch failed', err);
     }
   };
 
   return (
-    <header style={{ background: isDark ? '#1e293b' : '#0f172a', color: isDark ? '#f1f5f9' : '#ffffff', borderBottom: '1px solid #334155' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        
-        {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ background: isDark ? '#3f3f4f' : '#4f46e5', color: isDark ? '#f1f5f9' : '#ffffff', width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>
-            K
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.2 }}>KEYSTONE</h1>
-            <p style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#94a3b8', margin: 0 }}>Meridian Facilities Management</p>
-          </div>
+    <header className="ks-topbar">
+      <div className="ks-brand">
+        <div className="ks-brand-mark">K</div>
+        <div>
+          <div className="ks-brand-name">KEYSTONE</div>
+          <div className="ks-brand-sub">Field Service Management Platform</div>
         </div>
+      </div>
 
-        {/* Theme Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={toggleTheme}
-            style={{
-              width: 32, height: 32, borderRadius: 50, background: isDark ? '#334155' : '#f1f5f9', 
-              border: '1px solid #cbd5e1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            {isDark
-              ? <Sun size={18} color="#f1f5f9" />
-              : <Moon size={18} color="#334155" />}
-          </button>
-        </div>
-
-        {/* Role Navigation Tabs */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {(role === 'MANAGER' || role === 'DISPATCHER') && (
-            <button
-              onClick={() => onTabChange('board')}
-              className={`btn btn-sm ${currentTab === 'board' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'board' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
-            >
-              <ClipboardList size={14} /> Dispatch Board
-            </button>
-          )}
-
-          {role === 'MANAGER' && (
-            <button
-              onClick={() => onTabChange('dashboard')}
-              className={`btn btn-sm ${currentTab === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'dashboard' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
-            >
-              <BarChart3 size={14} /> Ops Dashboard
-            </button>
-          )}
-
-          {role === 'MANAGER' && (
-            <button
-              onClick={() => onTabChange('users')}
-              className={`btn btn-sm ${currentTab === 'users' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'users' ? '#4f46e5' : '#1e293b', color: '#ffffff', border: '1px solid #334155' }}
-            >
-              <UserIcon size={14} /> Users
-            </button>
-          )}
-
-          {(role === 'MANAGER' || role === 'DISPATCHER') && (
-            <button
-              onClick={() => onTabChange('customers')}
-              className={`btn btn-sm ${currentTab === 'customers' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'customers' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
-            >
-              <Building size={14} /> Customers & Sites
-            </button>
-          )}
-
-          {(role === 'TECHNICIAN' || role === 'MANAGER') && (
-            <button
-              onClick={() => onTabChange('field')}
-              className={`btn btn-sm ${currentTab === 'field' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'field' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
-            >
-              <Wrench size={14} /> Technician Field View
-            </button>
-          )}
-
-          {(role === 'CUSTOMER' || role === 'MANAGER') && (
-            <button
-              onClick={() => onTabChange('customer')}
-              className={`btn btn-sm ${currentTab === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ background: currentTab === 'customer' ? '#4f46e5' : '#1e293b', color: isDark ? '#ffffff' : '#ffffff', border: '1px solid #334155' }}
-            >
-              <Shield size={14} /> Customer Portal
-            </button>
-          )}
-        </nav>
-
-        {/* User Info & Quick Demo Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-            <div style={{ background: isDark ? '#334155' : '#f1f5f9', padding: '4px 8px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <UserIcon size={14} color={isDark ? '#38bdf8' : '#1e293b'} />
-              <span style={{ fontWeight: 600 }}>{user?.userName}</span>
-              <span style={{ fontSize: '0.75rem', color: isDark ? '#cbd5e1' : '#64748b', background: isDark ? '#475569' : '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>
-                {role}
-              </span>
-            </div>
+      <div className="ks-topbar-actions">
+        {demoMode && (
+          <div className="ks-demo">
+            <span>Demo:</span>
+            <button onClick={() => handleQuickSwitch('admin@meridian.com')}>Manager</button>
+            <button onClick={() => handleQuickSwitch('dispatcher@meridian.com')}>Dispatch</button>
+            <button onClick={() => handleQuickSwitch('tech@meridian.com')}>Tech</button>
+            <button onClick={() => handleQuickSwitch('customer@meridian.com')}>Customer</button>
           </div>
+        )}
 
-          {/* Quick Demo Switcher Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: '0.7rem', color: isDark ? '#cbd5e1' : '#64748b' }}>Demo Role:</span>
-            <button 
-              onClick={() => handleQuickSwitch('MANAGER', 'admin@meridian.com')}
-              title="Switch to Manager"
-              style={{ padding: '3px 6px', fontSize: '0.7rem', background: isDark ? '#334155' : '#f1f5f9', color: isDark ? '#fff' : '#1e293b', borderRadius: 4 }}
-            >
-              Manager
-            </button>
-            <button 
-              onClick={() => handleQuickSwitch('DISPATCHER', 'dispatcher@meridian.com')}
-              title="Switch to Dispatcher"
-              style={{ padding: '3px 6px', fontSize: '0.7rem', background: isDark ? '#334155' : '#f1f5f9', color: isDark ? '#fff' : '#1e293b', borderRadius: 4 }}
-            >
-              Dispatch
-            </button>
-            <button 
-              onClick={() => handleQuickSwitch('TECHNICIAN', 'tech@meridian.com')}
-              title="Switch to Technician"
-              style={{ padding: '3px 6px', fontSize: '0.7rem', background: isDark ? '#334155' : '#f1f5f9', color: isDark ? '#fff' : '#1e293b', borderRadius: 4 }}
-            >
-              Tech
-            </button>
-            <button 
-              onClick={() => handleQuickSwitch('CUSTOMER', 'customer@meridian.com')}
-              title="Switch to Customer"
-              style={{ padding: '3px 6px', fontSize: '0.7rem', background: isDark ? '#334155' : '#f1f5f9', color: isDark ? '#fff' : '#1e293b', borderRadius: 4 }}
-            >
-              Customer
-            </button>
-          </div>
+        <button className="ks-user-chip" onClick={() => onTabChange('profile')} title="View profile">
+          <span className="ks-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{initials(user?.userName)}</span>
+          <span style={{ fontWeight: 600 }}>{user?.userName}</span>
+          <span className="ks-role-tag">{role}</span>
+          {viewRole !== role && <span className="ks-role-tag" title="Manager preview of another role">Viewing as {viewRole}</span>}
+        </button>
 
-          <button onClick={logout} className="btn btn-sm btn-secondary" style={{ background: isDark ? '#334155' : '#f87171', color: isDark ? '#fff' : '#fff', border: 'none' }}>
-            <LogOut size={14} /> Exit
-          </button>
-        </div>
-
+        <button className="ks-btn ks-btn-gradient" onClick={logout}>
+          <LogOut size={15} /> Logout
+        </button>
       </div>
     </header>
   );

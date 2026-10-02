@@ -17,4 +17,11 @@ public class UpdateUserDTO {
 
     @NotNull
     private Role role;
+
+    // Organisation to link a CUSTOMER user to; ignored for staff roles.
+    private Long customerId;
+
+    // Optional: set a new password for the user.
+    @Size(min = 8, max = 100)
+    private String password;
 }

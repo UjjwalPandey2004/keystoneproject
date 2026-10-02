@@ -44,9 +44,17 @@ public class UserAuth {
 	private Role role;
 
 
+	// Organisation a CUSTOMER user belongs to; null for staff and unlinked accounts.
+	@Column(name="customer_id")
+	private Long customerId;
+
 	private String resettoken;
 	private Date tokenExpireTime;
-	
+
+	public boolean isLinkedTo(long organisationId) {
+		return customerId != null && customerId == organisationId;
+	}
+
 	
 //	public UserAuth() {}
 //	public UserAuth(Long id,

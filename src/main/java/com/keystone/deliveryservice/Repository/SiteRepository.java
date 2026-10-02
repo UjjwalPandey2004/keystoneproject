@@ -21,9 +21,9 @@ public interface SiteRepository  extends JpaRepository<Site,Long> {
 	@Query("""
 			select s from Site s
 			where s.customer.id = :customerId
-			and (lower(s.SiteName) like lower(concat('%', :query, '%'))
+			and (lower(s.siteName) like lower(concat('%', :query, '%'))
 			  or lower(s.address) like lower(concat('%', :query, '%'))
-			  or lower(s.City) like lower(concat('%', :query, '%')))
+			  or lower(s.city) like lower(concat('%', :query, '%')))
 			""")
 	Page<Site> searchByCustomerId(@Param("customerId") Long customerId,
 			@Param("query") String query, Pageable pageable);

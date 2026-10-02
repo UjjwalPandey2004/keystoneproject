@@ -28,17 +28,17 @@ public class Site {
  
 	@jakarta.persistence.Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
-	 private Long Id;
+	 private Long id;
 	 
 	 
-	 private String SiteName;
+	 private String siteName;
 	 private String buildingName;
 	 private Long roomNo;
 	 private String address;
-	 private String City;
-	 private String State;
-	 private String Country;
-	 private Long Zipcode;
+	 private String city;
+	 private String state;
+	 private String country;
+	 private Long zipcode;
 	 
 	 @com.fasterxml.jackson.annotation.JsonIgnore
 	 @ManyToOne(fetch=FetchType.LAZY)
@@ -46,19 +46,19 @@ public class Site {
 	 private Customer customer;
 
 	public Long getId() {
-		return Id;
+		return this.id;
 	}
 
 	public void setId(Long id) {
-		Id = id;
+		this.id = id;
 	}
 
 	public String getSiteName() {
-		return SiteName;
+		return this.siteName;
 	}
 
 	public void setSiteName(String siteName) {
-		SiteName = siteName;
+		this.siteName = siteName;
 	}
 
 	public String getBuildingName() {
@@ -86,35 +86,35 @@ public class Site {
 	}
 
 	public String getCity() {
-		return City;
+		return this.city;
 	}
 
 	public void setCity(String city) {
-		City = city;
+		this.city = city;
 	}
 
 	public String getState() {
-		return State;
+		return this.state;
 	}
 
 	public void setState(String state) {
-		State = state;
+		this.state = state;
 	}
 
 	public String getCountry() {
-		return Country;
+		return this.country;
 	}
 
 	public void setCountry(String country) {
-		Country = country;
+		this.country = country;
 	}
 
 	public Long getZipcode() {
-		return Zipcode;
+		return this.zipcode;
 	}
 
 	public void setZipcode(Long zipcode) {
-		Zipcode = zipcode;
+		this.zipcode = zipcode;
 	}
 
 	public Customer getCustomer() {

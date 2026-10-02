@@ -17,6 +17,7 @@ export interface User {
   userEmail: string;
   role: Role;
   phone?: string;
+  customerId?: number;
 }
 
 export interface AuthState {

@@ -66,7 +66,7 @@ Use `docker compose down -v` only when you also want to delete the local Keyston
 
 ## Development Accounts
 
-The migrations create demonstration accounts for each role. Their initial password is `password` and must be changed before any real deployment.
+The migrations create demonstration accounts for each role with the password `password`.
 
 | Role | Email |
 | --- | --- |
@@ -74,6 +74,15 @@ The migrations create demonstration accounts for each role. Their initial passwo
 | Dispatcher | `dispatcher@meridian.com` |
 | Technician | `tech@meridian.com` |
 | Customer | `customer@meridian.com` |
+
+These credentials only work when `DEMO_MODE=true` is set in `.env`, which also shows the one-click demo logins in the UI. Use it for local development only.
+
+With `DEMO_MODE=false` (the default), any seeded account still on the default password is rotated at startup:
+
+- `admin@meridian.com` gets `BOOTSTRAP_ADMIN_PASSWORD` if set; otherwise a generated password is written once to the backend log.
+- The other seeded accounts are locked until a manager sets a new password with `PUT /api/users/{id}`.
+
+Customer users see only the organisation they are linked to. A manager sets the link when creating the user; self-registered accounts have no organisation until a manager links them.
 
 ## Local Ports
 
@@ -162,6 +171,8 @@ keystoneproject/
 | `POSTGRES_USER` | Database user | Yes |
 | `POSTGRES_PASSWORD` | Database password | Yes |
 | `JWT_SECRET` | JWT signing key (min 32 chars) | Yes |
+| `DEMO_MODE` | Keep seeded demo passwords and show one-click logins (default `false`) | No |
+| `BOOTSTRAP_ADMIN_PASSWORD` | First password for `admin@meridian.com` when `DEMO_MODE` is off (min 8 chars) | No |
 | `MAIL_USERNAME` | SMTP username | No |
 | `MAIL_PASSWORD` | SMTP password | No |
 | `MAIL_ENABLED` | Enable email notifications | No |

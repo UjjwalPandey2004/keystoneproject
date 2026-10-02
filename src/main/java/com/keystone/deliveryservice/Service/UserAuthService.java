@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.keystone.deliveryservice.DTO.AuthResponseDTO;
+import com.keystone.deliveryservice.DTO.ChangePasswordDTO;
 import com.keystone.deliveryservice.DTO.ForgotPasswordDTO;
 import com.keystone.deliveryservice.DTO.LoginRequestDTO;
 import com.keystone.deliveryservice.DTO.RegisterRequestDTO;
@@ -103,6 +104,25 @@ public class UserAuthService {
         user.setResettoken(null);
         user.setTokenExpireTime(null);
 
+        userAuthRepo.save(user);
+    }
+
+    @Transactional
+    public void changePassword(String userEmail, ChangePasswordDTO change) {
+        UserAuth user = userAuthRepo.findByUserEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!passwordEncoder.matches(change.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+        if (!change.getNewPassword().equals(change.getConfirmPassword())) {
+            throw new IllegalArgumentException("New password and confirm password do not match");
+        }
+        if (change.getNewPassword().equals(change.getCurrentPassword())) {
+            throw new IllegalArgumentException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(change.getNewPassword()));
         userAuthRepo.save(user);
     }
 

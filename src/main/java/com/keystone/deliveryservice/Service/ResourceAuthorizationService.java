@@ -31,7 +31,7 @@ public class ResourceAuthorizationService {
     public void requireCustomerAccess(Customer customer, Authentication authentication) {
         UserAuth user = currentUser(authentication);
         if (user.getRole() == Role.CUSTOMER
-                && !customer.getEmail().equalsIgnoreCase(user.getUserEmail())) {
+                && !user.isLinkedTo(customer.getId())) {
             throw new AccessDeniedException("Customers can only access their own organization");
         }
     }
@@ -40,7 +40,7 @@ public class ResourceAuthorizationService {
         UserAuth user = currentUser(authentication);
         if (user.getRole() == Role.CUSTOMER
                 && (site.getCustomer() == null
-                    || !site.getCustomer().getEmail().equalsIgnoreCase(user.getUserEmail()))) {
+                    || !user.isLinkedTo(site.getCustomer().getId()))) {
             throw new AccessDeniedException("Customers can only access sites belonging to their organization");
         }
     }

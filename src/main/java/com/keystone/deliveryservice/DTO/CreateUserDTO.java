@@ -24,4 +24,7 @@ public class CreateUserDTO {
 
     @NotNull
     private Role role;
+
+    // Organisation to link a CUSTOMER user to; ignored for staff roles.
+    private Long customerId;
 }

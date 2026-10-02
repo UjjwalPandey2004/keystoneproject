@@ -20,4 +20,6 @@ public interface UserAuthRepository extends JpaRepository<UserAuth, Long> {
 
     List<UserAuth> findByRole(Role role);
 
+    List<UserAuth> findByPassword(String password);
+
 }

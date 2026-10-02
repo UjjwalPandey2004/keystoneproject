@@ -227,3 +227,221 @@ input, select, textarea {
   box-shadow: var(--shadow-lg);
   padding: 24px;
 }
+/* ============================================================
+   KEYSTONE signed-in shell: dark navy with purple/blue gradients,
+   matching the login page design language.
+   ============================================================ */
+.ks-shell {
+  --ks-bg: #0b1026;
+  --ks-bg-2: #141a3d;
+  --ks-panel: rgba(30, 32, 78, 0.72);
+  --ks-panel-solid: #1b1f4b;
+  --ks-border: rgba(129, 140, 248, 0.22);
+  --ks-text: #f1f5f9;
+  --ks-muted: #a5b4fc;
+  --ks-dim: #94a3b8;
+  --ks-accent: #6366f1;
+  --ks-accent-2: #a855f7;
+  --ks-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+
+  /* Re-point the shared tokens so existing pages render dark. */
+  --bg-main: var(--ks-bg);
+  --bg-card: var(--ks-panel);
+  --border: var(--ks-border);
+  --text-main: var(--ks-text);
+  --text-muted: var(--ks-dim);
+  --text-light: #64748b;
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: var(--ks-text);
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(168, 85, 247, 0.18), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(99, 102, 241, 0.18), transparent 60%),
+    linear-gradient(180deg, var(--ks-bg-2) 0%, var(--ks-bg) 100%);
+}
+
+/* Top bar */
+.ks-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  background: rgba(11, 16, 38, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--ks-border);
+}
+.ks-brand { display: flex; align-items: center; gap: 12px; }
+.ks-brand-mark {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ks-gradient); color: #fff; font-weight: 800; font-size: 18px;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+}
+.ks-brand-name { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1.1; }
+.ks-brand-sub { font-size: 0.72rem; color: var(--ks-muted); }
+.ks-topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ks-user-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px 4px 4px; border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.12); border: 1px solid var(--ks-border);
+  font-size: 0.85rem; cursor: pointer; color: var(--ks-text);
+}
+.ks-role-tag {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 9999px; background: var(--ks-gradient); color: #fff;
+}
+.ks-avatar {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--ks-gradient); color: #fff; font-weight: 700;
+}
+.ks-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 10px; font-size: 0.85rem; font-weight: 600;
+  color: var(--ks-text); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ks-border);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.ks-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.ks-btn-gradient { background: var(--ks-gradient); border: none; color: #fff; box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35); }
+.ks-btn-gradient:hover { background: var(--ks-gradient); transform: translateY(-1px); }
+.ks-demo { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--ks-dim); }
+.ks-demo button {
+  padding: 3px 7px; border-radius: 6px; font-size: 0.7rem;
+  color: var(--ks-text); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ks-border);
+}
+
+/* Body: sidebar + content */
+.ks-body { flex: 1; display: flex; min-height: 0; }
+.ks-sidebar {
+  width: 240px; flex-shrink: 0;
+  padding: 20px 14px;
+  border-right: 1px solid var(--ks-border);
+  background: rgba(11, 16, 38, 0.55);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ks-nav-label {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ks-dim); padding: 6px 12px 8px;
+}
+.ks-nav-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 12px; border-radius: 10px; text-align: left;
+  color: #cbd5e1; font-size: 0.9rem; font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ks-nav-item:hover { background: rgba(99, 102, 241, 0.14); color: #fff; }
+.ks-nav-item.active { background: var(--ks-gradient); color: #fff; box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35); }
+.ks-view-as {
+  margin-bottom: 12px; padding: 10px; border-radius: 12px;
+  background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(168, 85, 247, 0.35);
+}
+.ks-view-as .ks-nav-label { padding: 0 2px 6px; }
+.ks-view-as select {
+  width: 100%; padding: 8px 10px; border-radius: 8px; font-size: 0.85rem;
+  background: rgba(11, 16, 38, 0.7); color: var(--ks-text); border: 1px solid var(--ks-border);
+}
+.ks-view-as select option { background: var(--ks-panel-solid); color: var(--ks-text); }
+.ks-sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--ks-border); }
+.ks-nav-logout { color: #fca5a5; }
+.ks-nav-logout:hover { background: rgba(248, 113, 113, 0.14); color: #fecaca; }
+.ks-success { color: #86efac; }
+.ks-content { flex: 1; min-width: 0; padding: 28px; }
+.ks-content-inner { max-width: 1300px; margin: 0 auto; }
+
+/* Page building blocks */
+.ks-page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.01em; }
+.ks-page-sub { color: var(--ks-muted); font-size: 0.9rem; margin-top: 2px; }
+.ks-card {
+  background: var(--ks-panel);
+  border: 1px solid var(--ks-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.45);
+  padding: 22px;
+}
+.ks-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.ks-tile {
+  text-align: left; cursor: pointer; color: var(--ks-text);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.ks-tile:hover { transform: translateY(-3px); border-color: rgba(168, 85, 247, 0.55); }
+.ks-tile-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ks-gradient); color: #fff; margin-bottom: 14px;
+}
+.ks-tile-value { font-size: 1.9rem; font-weight: 800; line-height: 1.1; }
+.ks-tile-title { font-weight: 700; margin-top: 4px; }
+.ks-tile-desc { font-size: 0.8rem; color: var(--ks-dim); margin-top: 4px; }
+.ks-hero {
+  border-radius: 18px; padding: 26px 28px; margin-bottom: 22px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.35) 0%, rgba(168, 85, 247, 0.30) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.5);
+}
+.ks-field { display: grid; grid-template-columns: 140px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--ks-border); }
+.ks-field:last-child { border-bottom: none; }
+.ks-field-label { color: var(--ks-dim); font-size: 0.85rem; }
+.ks-field-value { font-weight: 600; word-break: break-word; }
+.ks-error { color: #fca5a5; }
+
+/* Existing pages inside the shell */
+.ks-shell .card { border-radius: 14px; backdrop-filter: blur(6px); box-shadow: 0 10px 26px rgba(2, 6, 23, 0.4); }
+.ks-shell .modal-content { background: var(--ks-panel-solid); border: 1px solid var(--ks-border); color: var(--ks-text); }
+.ks-shell .btn-primary { background: var(--ks-gradient); color: #fff; }
+.ks-shell .btn-primary:hover { background: var(--ks-gradient); filter: brightness(1.1); }
+.ks-shell .btn-secondary { background: rgba(255, 255, 255, 0.06); color: var(--ks-text); border: 1px solid var(--ks-border); }
+.ks-shell .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+.ks-shell input, .ks-shell select, .ks-shell textarea {
+  background: rgba(11, 16, 38, 0.7); color: var(--ks-text);
+  border: 1px solid var(--ks-border); border-radius: 8px; padding: 8px 10px;
+}
+.ks-shell input::placeholder, .ks-shell textarea::placeholder { color: #64748b; }
+.ks-shell select option { background: var(--ks-panel-solid); color: var(--ks-text); }
+.ks-shell table th { color: var(--ks-muted); }
+
+/* Existing pages hard-code light-theme inline colours; remap them inside the shell. */
+.ks-content [style*="color: rgb(15, 23, 42)"],
+.ks-content [style*="color: rgb(30, 41, 59)"],
+.ks-content [style*="color: rgb(51, 65, 85)"] { color: var(--ks-text) !important; }
+.ks-content [style*="color: rgb(71, 85, 105)"],
+.ks-content [style*="color: rgb(100, 116, 139)"] { color: #a3aed0 !important; }
+.ks-content [style*="color: rgb(79, 70, 229)"] { color: #a5b4fc !important; }
+.ks-content [style*="background: rgb(255, 255, 255)"],
+.ks-content [style*="background: rgb(248, 250, 252)"],
+.ks-content [style*="background: rgb(241, 245, 249)"],
+.ks-content [style*="background-color: rgb(255, 255, 255)"],
+.ks-content [style*="background-color: rgb(248, 250, 252)"] { background: rgba(255, 255, 255, 0.05) !important; }
+.ks-content [style*="background: rgb(238, 242, 255)"],
+.ks-content [style*="background: rgb(239, 246, 255)"],
+.ks-content [style*="background: rgb(236, 253, 245)"],
+.ks-content [style*="background: rgb(254, 242, 242)"],
+.ks-content [style*="background: rgb(255, 247, 237)"] { background: rgba(99, 102, 241, 0.18) !important; }
+.ks-content [style*="border-bottom: 1px solid rgb(226, 232, 240)"],
+.ks-content [style*="border-top: 1px solid rgb(226, 232, 240)"],
+.ks-content [style*="border: 1px solid rgb(226, 232, 240)"],
+.ks-content [style*="border-bottom: 1px solid rgb(203, 213, 225)"] { border-color: var(--ks-border) !important; }
+
+/* Responsive: sidebar becomes a horizontal scroller on small screens */
+@media (max-width: 860px) {
+  .ks-body { flex-direction: column; }
+  .ks-sidebar {
+    width: 100%; flex-direction: row; overflow-x: auto; gap: 6px;
+    padding: 10px 12px; border-right: none; border-bottom: 1px solid var(--ks-border);
+  }
+  .ks-nav-label { display: none; }
+  .ks-nav-item { width: auto; white-space: nowrap; padding: 8px 12px; }
+  .ks-view-as { margin-bottom: 0; padding: 4px; flex-shrink: 0; }
+  .ks-view-as select { width: auto; }
+  .ks-sidebar-footer { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; }
+  .ks-content { padding: 18px 16px; }
+  .ks-topbar { padding: 10px 16px; }
+  .ks-demo { display: none; }
+  .ks-field { grid-template-columns: 1fr; gap: 2px; }
+}

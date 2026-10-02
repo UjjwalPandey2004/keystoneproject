@@ -13,4 +13,5 @@ public class UserResponseDTO {
     private String userEmail;
     private String phone;
     private Role role;
+    private Long customerId;
 }

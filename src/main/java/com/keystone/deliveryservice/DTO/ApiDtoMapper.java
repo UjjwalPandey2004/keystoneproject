@@ -32,14 +32,14 @@ public final class ApiDtoMapper {
 
     public static Site toSiteEntity(SiteRequestDTO dto) {
         return Site.builder()
-                .SiteName(dto.getSiteName())
+                .siteName(dto.getSiteName())
                 .buildingName(dto.getBuildingName())
                 .roomNo(dto.getRoomNo())
                 .address(dto.getAddress())
-                .City(dto.getCity())
-                .State(dto.getState())
-                .Country(dto.getCountry())
-                .Zipcode(dto.getZipcode())
+                .city(dto.getCity())
+                .state(dto.getState())
+                .country(dto.getCountry())
+                .zipcode(dto.getZipcode())
                 .build();
     }
 

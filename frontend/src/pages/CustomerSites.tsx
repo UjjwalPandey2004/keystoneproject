@@ -7,7 +7,7 @@ import { Building, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 const EMPTY_CUSTOMER = { companyName: '', contactPerson: '', email: '', phone: '', address: '', active: true };
 
 export const CustomerSites: React.FC = () => {
-  const { role } = useAuth();
+  const { viewRole: role } = useAuth(); // follows a manager's "View As" preview
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
 

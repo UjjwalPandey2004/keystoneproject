@@ -4,7 +4,7 @@ import { Shield, Wrench, ClipboardList, Building2, KeyRound, AlertCircle, CheckC
 import { useTheme } from '../context/ThemeContext';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, demoMode } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,7 +75,7 @@ export const LoginPage: React.FC = () => {
         {/* Right Side: Login Card & Demo Quick Logins */}
         <div style={{ background: isDark ? '#334155' : '#ffffff', borderRadius: 16, padding: 32, boxShadow: isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.5)' : '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a', marginBottom: 6 }}>Sign In</h2>
-          <p style={{ fontSize: '0.875rem', color: isDark ? '#94a3b8' : '#64748b', marginBottom: 20 }}>Select a role or sign in with your credentials.</p>
+          <p style={{ fontSize: '0.875rem', color: isDark ? '#94a3b8' : '#64748b', marginBottom: 20 }}>{demoMode ? 'Select a role or sign in with your credentials.' : 'Sign in with your credentials.'}</p>
 
           {error && (
             <div style={{ background: isDark ? '#3f3f4f' : '#fef2f2', border: isDark ? '1px solid #4f46e5' : '1px solid #fecaca', color: isDark ? '#9f7ae2' : '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
@@ -119,6 +119,7 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Seed Quick-Login Buttons */}
+          {demoMode && (
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: isDark ? '1px solid #475569' : '1px solid #e2e8f0' }}>
             <p style={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
               One-Click Seed Logins (For Review & Demo)
@@ -169,6 +170,7 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
         </div>
 

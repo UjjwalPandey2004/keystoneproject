@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { userApi } from '../services/api';
-import { Role, User } from '../types';
+import { customerApi, userApi } from '../services/api';
+import { Customer, Role, User } from '../types';
 
 const roles: Role[] = ['MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
 
+const emptyForm = { userName: '', userEmail: '', password: '', phone: '', role: 'TECHNICIAN' as Role, customerId: '' };
+
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ userName: '', userEmail: '', password: '', phone: '', role: 'TECHNICIAN' as Role });
+  const [form, setForm] = useState(emptyForm);
 
   const load = async () => {
     try {
       setLoading(true);
-      setUsers(await userApi.list());
+      const [userList, customerList] = await Promise.all([userApi.list(), customerApi.getAll()]);
+      setUsers(userList);
+      setCustomers(customerList || []);
       setError('');
     } catch (requestError: any) {
       setError(requestError.response?.data?.message || 'Unable to load users');
@@ -27,13 +32,20 @@ export const UserManagement: React.FC = () => {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      await userApi.create(form);
-      setForm({ userName: '', userEmail: '', password: '', phone: '', role: 'TECHNICIAN' });
+      const { customerId, ...rest } = form;
+      await userApi.create({
+        ...rest,
+        customerId: form.role === 'CUSTOMER' && customerId ? Number(customerId) : undefined,
+      });
+      setForm(emptyForm);
       await load();
     } catch (requestError: any) {
       setError(requestError.response?.data?.message || 'Unable to create user');
     }
   };
+
+  const organisationName = (user: User) =>
+    user.customerId ? customers.find((customer) => customer.id === user.customerId)?.companyName || `#${user.customerId}` : '—';
 
   return (
     <div>
@@ -52,19 +64,26 @@ export const UserManagement: React.FC = () => {
         <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
           {roles.map((role) => <option key={role} value={role}>{role}</option>)}
         </select>
+        {form.role === 'CUSTOMER' && (
+          <select required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+            <option value="">Select organisation…</option>
+            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
+          </select>
+        )}
         <button className="btn btn-primary" type="submit">Create User</button>
       </form>
 
       <div className="card" style={{ overflowX: 'auto' }}>
         {loading ? <p>Loading users...</p> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>{['Name', 'Email', 'Phone', 'Role'].map((heading) => <th key={heading} style={{ textAlign: 'left', padding: 10, borderBottom: '1px solid #cbd5e1' }}>{heading}</th>)}</tr></thead>
+            <thead><tr>{['Name', 'Email', 'Phone', 'Role', 'Organisation'].map((heading) => <th key={heading} style={{ textAlign: 'left', padding: 10, borderBottom: '1px solid #cbd5e1' }}>{heading}</th>)}</tr></thead>
             <tbody>{users.map((user) => (
               <tr key={user.id}>
                 <td style={{ padding: 10, borderBottom: '1px solid #e2e8f0' }}>{user.userName}</td>
                 <td style={{ padding: 10, borderBottom: '1px solid #e2e8f0' }}>{user.userEmail}</td>
                 <td style={{ padding: 10, borderBottom: '1px solid #e2e8f0' }}>{user.phone || '—'}</td>
                 <td style={{ padding: 10, borderBottom: '1px solid #e2e8f0' }}><span className="badge badge-assigned">{user.role}</span></td>
+                <td style={{ padding: 10, borderBottom: '1px solid #e2e8f0' }}>{organisationName(user)}</td>
               </tr>
             ))}</tbody>
           </table>

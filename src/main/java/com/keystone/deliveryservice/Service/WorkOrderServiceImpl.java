@@ -87,7 +87,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         }
 
         // Customer can only raise requests for their own organization
-        if (currentUser.getRole() == Role.CUSTOMER && !customer.getEmail().equalsIgnoreCase(currentUser.getUserEmail())) {
+        if (currentUser.getRole() == Role.CUSTOMER && !currentUser.isLinkedTo(customer.getId())) {
             throw new AccessDeniedException("You are only allowed to create work orders for your own organization");
         }
 
@@ -164,13 +164,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
         if (currentUser.getRole() == Role.CUSTOMER) {
             // Force customer scoped search
-            Customer customer = customerRepo.findByEmail(currentUser.getUserEmail())
-                    .orElseThrow(() -> new IllegalArgumentException("Customer profile not found for user: " + currentUser.getUserEmail()));
+            Long ownCustomerId = currentUser.getCustomerId();
 
-            if (status != null) {
-                page = workOrderRepo.findByCustomerIdAndStatus(customer.getId(), status, pageable);
+            if (ownCustomerId == null) {
+                // Not linked to an organisation yet: nothing is visible.
+                page = Page.empty(pageable);
+            } else if (status != null) {
+                page = workOrderRepo.findByCustomerIdAndStatus(ownCustomerId, status, pageable);
             } else {
-                page = workOrderRepo.findByCustomerId(customer.getId(), pageable);
+                page = workOrderRepo.findByCustomerId(ownCustomerId, pageable);
             }
         } else if (currentUser.getRole() == Role.TECHNICIAN) {
             // Force technician assigned jobs
@@ -492,7 +494,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     private void enforceReadAccess(WorkOrder workOrder, UserAuth currentUser) {
         if (currentUser.getRole() == Role.CUSTOMER) {
-            if (!workOrder.getCustomer().getEmail().equalsIgnoreCase(currentUser.getUserEmail())) {
+            if (!currentUser.isLinkedTo(workOrder.getCustomer().getId())) {
                 throw new AccessDeniedException("Customers can only view work orders belonging to their organization.");
             }
         } else if (currentUser.getRole() == Role.TECHNICIAN) {

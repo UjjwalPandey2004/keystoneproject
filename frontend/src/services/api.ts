@@ -36,8 +36,20 @@ export const authApi = {
     const res = await api.post('/api/auth/login', { userEmail, password });
     return res.data;
   },
+  me: async () => {
+    const res = await api.get<User>('/api/auth/me');
+    return res.data;
+  },
+  getConfig: async () => {
+    const res = await api.get<{ demoMode: boolean }>('/api/auth/config');
+    return res.data;
+  },
   register: async (data: any) => {
     const res = await api.post('/api/auth/register', data);
+    return res.data;
+  },
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    const res = await api.post<{ message: string }>('/api/auth/change-password', { currentPassword, newPassword, confirmPassword });
     return res.data;
   },
   logout: async () => {
@@ -52,8 +64,12 @@ export const authApi = {
 
 export const customerApi = {
   getAll: async () => {
-    const res = await api.get<{ content: Customer[] }>('/api/customers');
+    const res = await api.get<{ content: Customer[] }>('/api/customers', { params: { size: 100 } });
     return res.data.content;
+  },
+  getMine: async () => {
+    const res = await api.get<Customer>('/api/customers/me');
+    return res.data;
   },
   getById: async (id: number) => {
     const res = await api.get<Customer>(`/api/customers/${id}`);
@@ -100,7 +116,7 @@ export const userApi = {
     const res = await api.get<{ content: User[] }>('/api/users');
     return res.data.content;
   },
-  create: async (data: { userName: string; userEmail: string; password: string; phone?: string; role: string }) => {
+  create: async (data: { userName: string; userEmail: string; password: string; phone?: string; role: string; customerId?: number }) => {
     const res = await api.post<User>('/api/users', data);
     return res.data;
   },
