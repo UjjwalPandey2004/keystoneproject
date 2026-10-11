@@ -25,6 +25,7 @@ import com.keystone.deliveryservice.DTO.LogTimeDTO;
 import com.keystone.deliveryservice.DTO.PartUsageDTO;
 import com.keystone.deliveryservice.DTO.TechnicianNotesDTO;
 import com.keystone.deliveryservice.DTO.TimeLogDTO;
+import com.keystone.deliveryservice.DTO.CancelRequestDTO;
 import com.keystone.deliveryservice.DTO.TransitionStatusDTO;
 import com.keystone.deliveryservice.DTO.UpdateWorkOrderDTO;
 import com.keystone.deliveryservice.DTO.WorkOrderResponseDTO;
@@ -66,7 +67,7 @@ public class WorkOrderController {
 
     @Operation(summary = "List work orders with role-scoping, filtering, and pagination")
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
     public ResponseEntity<Page<WorkOrderResponseDTO>> listWorkOrders(
             @RequestParam(required = false) WorkOrderStatus status,
             @RequestParam(required = false) Long customerId,
@@ -85,7 +86,7 @@ public class WorkOrderController {
 
     @Operation(summary = "Fetch a single work order by ID with complete audit history and line items")
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
     public ResponseEntity<WorkOrderResponseDTO> getWorkOrderById(
             @PathVariable Long id,
             Authentication auth) {
@@ -117,13 +118,25 @@ public class WorkOrderController {
 
     @Operation(summary = "Transition work order status validated against the state machine lifecycle")
     @PostMapping("/{id}/status")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
     public ResponseEntity<WorkOrderResponseDTO> transitionStatus(
             @PathVariable Long id,
             @Valid @RequestBody TransitionStatusDTO dto,
             Authentication auth) {
         UserAuth user = getCurrentUser(auth);
         return ResponseEntity.ok(workOrderService.transitionStatus(id, dto, user));
+    }
+
+    @Operation(summary = "Cancel a request before work starts (NEW or ASSIGNED). Customers: own organisation only; "
+            + "another organisation's request answers 404.")
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'CUSTOMER')")
+    public ResponseEntity<WorkOrderResponseDTO> cancelRequest(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) CancelRequestDTO dto,
+            Authentication auth) {
+        UserAuth user = getCurrentUser(auth);
+        return ResponseEntity.ok(workOrderService.cancelRequest(id, dto == null ? null : dto.getReason(), user));
     }
 
     @Operation(summary = "Log parts used on a job (Technician / Manager) - transactionally decrements inventory stock")

@@ -31,6 +31,9 @@ public interface WorkOrderService {
 
     WorkOrderResponseDTO transitionStatus(Long id, TransitionStatusDTO dto, UserAuth currentUser);
 
+    // Cancel a request that has not started yet; customers may cancel their own organisation's requests.
+    WorkOrderResponseDTO cancelRequest(Long id, String reason, UserAuth currentUser);
+
     PartUsageDTO logParts(Long id, LogPartsDTO dto, UserAuth currentUser);
 
     TimeLogDTO logTime(Long id, LogTimeDTO dto, UserAuth currentUser);

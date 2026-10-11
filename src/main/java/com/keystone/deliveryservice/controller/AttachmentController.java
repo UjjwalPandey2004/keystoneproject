@@ -27,7 +27,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/work-orders/{workOrderId}/attachments")
-@PreAuthorize("isAuthenticated()")
+@PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
 @Tag(name = "Work Order Attachments", description = "Photos and documents on a work order (same access as the work order)")
 public class AttachmentController {
 

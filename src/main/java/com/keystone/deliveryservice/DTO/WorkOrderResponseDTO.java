@@ -53,6 +53,12 @@ public class WorkOrderResponseDTO {
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
     private LocalDateTime closedAt;
+    private String closedByName;
+    private LocalDateTime cancelledAt;
+    private String cancelledByName;
+    private String cancellationReason;
+    // True when the signed-in user may cancel this request right now.
+    private boolean cancellable;
 
     // Audit and line-items
     private List<WorkOrderStatusHistoryDTO> statusHistory;

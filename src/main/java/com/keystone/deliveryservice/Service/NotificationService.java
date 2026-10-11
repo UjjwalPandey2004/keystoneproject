@@ -29,6 +29,7 @@ public class NotificationService {
 
     public static final String WORK_ORDER = "WORK_ORDER";
     public static final String PAYMENT = "PAYMENT";
+    public static final String APPLICATION = "APPLICATION";
 
     private final NotificationRepository notificationRepository;
     private final UserAuthRepository userRepository;

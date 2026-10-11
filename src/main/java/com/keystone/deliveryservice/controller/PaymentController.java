@@ -17,9 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.keystone.deliveryservice.DTO.CreatePaymentDTO;
+import com.keystone.deliveryservice.DTO.MyPaymentSummaryDTO;
 import com.keystone.deliveryservice.DTO.PaymentConfigDTO;
 import com.keystone.deliveryservice.DTO.PaymentReferenceDTO;
 import com.keystone.deliveryservice.DTO.PaymentResponseDTO;
+import com.keystone.deliveryservice.DTO.PaymentStatsDTO;
 import com.keystone.deliveryservice.DTO.RejectPaymentDTO;
 import com.keystone.deliveryservice.Entity.Payment;
 import com.keystone.deliveryservice.Service.PaymentService;
@@ -53,14 +55,35 @@ public class PaymentController {
         return paymentService.config();
     }
 
-    @Operation(summary = "List payments: all for managers, own organisation's for customers")
+    @Operation(summary = "All payments from every customer (Manager only)")
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'CUSTOMER')")
+    @PreAuthorize("hasRole('MANAGER')")
     public List<PaymentResponseDTO> list(Authentication authentication) {
-        return paymentService.list(authorizationService.currentUser(authentication));
+        return paymentService.listAll(authorizationService.currentUser(authentication));
     }
 
-    @Operation(summary = "Get one payment (manager, or the customer it belongs to)")
+    @Operation(summary = "Company-wide payment statistics: revenue, counts per method and status (Manager only)")
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('MANAGER')")
+    public PaymentStatsDTO stats(Authentication authentication) {
+        return paymentService.stats(authorizationService.currentUser(authentication));
+    }
+
+    @Operation(summary = "The signed-in customer's own payments; the customer is taken from the JWT (Customer only)")
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public List<PaymentResponseDTO> mine(Authentication authentication) {
+        return paymentService.listMine(authorizationService.currentUser(authentication));
+    }
+
+    @Operation(summary = "Totals over the signed-in customer's own payments (Customer only)")
+    @GetMapping("/my/summary")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public MyPaymentSummaryDTO mySummary(Authentication authentication) {
+        return paymentService.mySummary(authorizationService.currentUser(authentication));
+    }
+
+    @Operation(summary = "Get one payment (manager, or the customer who made it; anyone else gets 404)")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'CUSTOMER')")
     public PaymentResponseDTO get(@PathVariable Long id, Authentication authentication) {

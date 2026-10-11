@@ -74,6 +74,7 @@ The migrations create demonstration accounts for each role with the password `pa
 | Dispatcher | `dispatcher@meridian.com` |
 | Technician | `tech@meridian.com` |
 | Customer | `customer@meridian.com` |
+| HR | `hr@meridian.com` |
 
 These credentials only work when `DEMO_MODE=true` is set in `.env`, which also shows the one-click demo logins in the UI. Use it for local development only.
 

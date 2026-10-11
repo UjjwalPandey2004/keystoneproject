@@ -105,6 +105,22 @@ public class WorkOrder {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    // Manager who signed the work order off (COMPLETED -> CLOSED).
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "closed_by_id")
+    private UserAuth closedBy;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    // Customer, dispatcher or manager who cancelled the request.
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cancelled_by_id")
+    private UserAuth cancelledBy;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
     @JsonIgnore
     @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("changedAt ASC")

@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.keystone.deliveryservice.DTO.CreatePaymentDTO;
+import com.keystone.deliveryservice.DTO.MyPaymentSummaryDTO;
 import com.keystone.deliveryservice.DTO.PaymentConfigDTO;
 import com.keystone.deliveryservice.DTO.PaymentResponseDTO;
+import com.keystone.deliveryservice.DTO.PaymentStatsDTO;
 import com.keystone.deliveryservice.ENUM.NotificationType;
 import com.keystone.deliveryservice.ENUM.PaymentMethod;
 import com.keystone.deliveryservice.ENUM.PaymentStatus;
@@ -27,6 +30,7 @@ import com.keystone.deliveryservice.Entity.UserAuth;
 import com.keystone.deliveryservice.Entity.WorkOrder;
 import com.keystone.deliveryservice.Repository.PaymentRepository;
 import com.keystone.deliveryservice.Repository.WorkOrderRepository;
+import com.keystone.deliveryservice.Security.ResourceNotFoundException;
 
 /**
  * Customer payments: cash, UPI (Google Pay / PhonePe / Paytm / other), UPI QR, or card at the visit.
@@ -165,8 +169,7 @@ public class PaymentService {
     /** Manager confirms the customer's money arrived. */
     public PaymentResponseDTO confirm(Long paymentId, UserAuth manager) {
         requireManager(manager);
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        Payment payment = findPayment(paymentId);
         requirePending(payment);
         if (payment.getMethod().isUpi() && payment.getTransactionRef() == null) {
             throw new IllegalStateException("This UPI payment has no transaction reference yet. "
@@ -194,8 +197,7 @@ public class PaymentService {
     /** Manager marks the payment as failed (e.g. no matching UPI credit). */
     public PaymentResponseDTO reject(Long paymentId, String reason, UserAuth manager) {
         requireManager(manager);
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        Payment payment = findPayment(paymentId);
         requirePending(payment);
         payment.setStatus(PaymentStatus.FAILED);
         payment.setFailureReason(reason.trim());
@@ -209,17 +211,70 @@ public class PaymentService {
         return toDTO(payment);
     }
 
-    /** Managers see every payment; a customer sees only the payments they made themselves. */
+    /** Every payment in the system. Manager only. */
     @Transactional(readOnly = true)
-    public List<PaymentResponseDTO> list(UserAuth user) {
-        if (user.getRole() == Role.MANAGER) {
-            return paymentRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toDTO).toList();
-        }
-        if (user.getRole() == Role.CUSTOMER) {
-            return paymentRepository.findByPayerIdOrderByCreatedAtDesc(user.getId()).stream()
-                    .map(this::toDTO).toList();
-        }
-        throw new AccessDeniedException("Payments are only available to managers and customers.");
+    public List<PaymentResponseDTO> listAll(UserAuth manager) {
+        requireManager(manager);
+        return paymentRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toDTO).toList();
+    }
+
+    /** The signed-in customer's own payments. The customer comes from the JWT, never from the request. */
+    @Transactional(readOnly = true)
+    public List<PaymentResponseDTO> listMine(UserAuth customer) {
+        requireCustomer(customer);
+        return paymentRepository.findByPayerIdOrderByCreatedAtDesc(customer.getId()).stream()
+                .map(this::toDTO).toList();
+    }
+
+    /** Company-wide totals. Manager only. */
+    @Transactional(readOnly = true)
+    public PaymentStatsDTO stats(UserAuth manager) {
+        requireManager(manager);
+        List<Payment> all = paymentRepository.findAll();
+        return PaymentStatsDTO.builder()
+                .totalRevenue(sum(all, p -> p.getStatus() == PaymentStatus.PAID))
+                .totalPayments(all.size())
+                .paidPayments(count(all, p -> p.getStatus() == PaymentStatus.PAID))
+                .cashPayments(count(all, p -> p.getMethod() == PaymentMethod.CASH))
+                .upiPayments(count(all, p -> p.getMethod() == PaymentMethod.UPI))
+                .qrPayments(count(all, p -> p.getMethod() == PaymentMethod.UPI_QR))
+                .cardPayments(count(all, p -> p.getMethod() == PaymentMethod.CARD))
+                .cashRevenue(sum(all, p -> p.getStatus() == PaymentStatus.PAID && p.getMethod() == PaymentMethod.CASH))
+                .upiRevenue(sum(all, p -> p.getStatus() == PaymentStatus.PAID && p.getMethod() == PaymentMethod.UPI))
+                .qrRevenue(sum(all, p -> p.getStatus() == PaymentStatus.PAID && p.getMethod() == PaymentMethod.UPI_QR))
+                .cardRevenue(sum(all, p -> p.getStatus() == PaymentStatus.PAID && p.getMethod() == PaymentMethod.CARD))
+                .pendingPayments(count(all, p -> p.getStatus() == PaymentStatus.PENDING))
+                .pendingAmount(sum(all, p -> p.getStatus() == PaymentStatus.PENDING))
+                .failedPayments(count(all, p -> p.getStatus() == PaymentStatus.FAILED))
+                .cancelledPayments(count(all, p -> p.getStatus() == PaymentStatus.CANCELLED))
+                .currency(CURRENCY)
+                .build();
+    }
+
+    /** Totals over the signed-in customer's own payments only. */
+    @Transactional(readOnly = true)
+    public MyPaymentSummaryDTO mySummary(UserAuth customer) {
+        requireCustomer(customer);
+        List<Payment> mine = paymentRepository.findByPayerIdOrderByCreatedAtDesc(customer.getId());
+        BigDecimal paid = sum(mine, p -> p.getStatus() == PaymentStatus.PAID);
+        BigDecimal pending = sum(mine, p -> p.getStatus() == PaymentStatus.PENDING);
+        return MyPaymentSummaryDTO.builder()
+                .totalAmount(paid.add(pending))
+                .paidAmount(paid)
+                .pendingAmount(pending)
+                .paymentCount(mine.size())
+                .pendingCount(count(mine, p -> p.getStatus() == PaymentStatus.PENDING))
+                .currency(CURRENCY)
+                .build();
+    }
+
+    private static long count(List<Payment> payments, Predicate<Payment> filter) {
+        return payments.stream().filter(filter).count();
+    }
+
+    private static BigDecimal sum(List<Payment> payments, Predicate<Payment> filter) {
+        return payments.stream().filter(filter).map(Payment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
     }
 
     @Transactional(readOnly = true)
@@ -237,17 +292,25 @@ public class PaymentService {
         return payment;
     }
 
+    private Payment findPayment(Long paymentId) {
+        return paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
+    }
+
     private Payment findVisiblePayment(Long paymentId, UserAuth user) {
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        if (user.getRole() != Role.MANAGER && user.getRole() != Role.CUSTOMER) {
+            throw new AccessDeniedException("Payments are only available to managers and customers.");
+        }
+        Payment payment = findPayment(paymentId);
         if (user.getRole() == Role.MANAGER) {
             return payment;
         }
         // Ownership is checked on the server: only the customer who made the payment.
-        if (user.getRole() == Role.CUSTOMER && payment.getPayer() != null && payment.getPayer().getId().equals(user.getId())) {
+        // Someone else's payment answers 404 like a missing one, so IDs cannot be probed.
+        if (payment.getPayer() != null && payment.getPayer().getId().equals(user.getId())) {
             return payment;
         }
-        throw new AccessDeniedException("You do not have access to this payment.");
+        throw new ResourceNotFoundException("Payment not found");
     }
 
     private Payment findOwnPayment(Long paymentId, UserAuth customer) {
@@ -265,7 +328,13 @@ public class PaymentService {
 
     private static void requireManager(UserAuth user) {
         if (user.getRole() != Role.MANAGER) {
-            throw new AccessDeniedException("Only managers can confirm or reject payments.");
+            throw new AccessDeniedException("Only managers can manage payments.");
+        }
+    }
+
+    private static void requireCustomer(UserAuth user) {
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new AccessDeniedException("Only customers have their own payments.");
         }
     }
 

@@ -30,7 +30,7 @@ public class SeedAccountGuard implements ApplicationRunner {
     static final String SEED_PASSWORD_HASH = "$2a$10$HbzC5IFm1o0GfahWLdQ7gemdRGAU3xSSBkwuaETiL9PYZRNFq6rSC";
     static final String SEED_MANAGER_EMAIL = "admin@meridian.com";
     static final List<String> SEED_EMAILS = List.of(SEED_MANAGER_EMAIL, "dispatcher@meridian.com",
-            "tech@meridian.com", "customer@meridian.com");
+            "tech@meridian.com", "customer@meridian.com", "hr@meridian.com");
     private static final int MIN_PASSWORD_LENGTH = 8;
 
     private final UserAuthRepository userRepository;

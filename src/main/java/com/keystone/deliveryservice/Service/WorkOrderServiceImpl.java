@@ -31,6 +31,7 @@ import com.keystone.deliveryservice.DTO.WorkOrderStatusHistoryDTO;
 import com.keystone.deliveryservice.ENUM.NotificationType;
 import com.keystone.deliveryservice.ENUM.Priority;
 import com.keystone.deliveryservice.ENUM.Role;
+import com.keystone.deliveryservice.Security.ResourceNotFoundException;
 import com.keystone.deliveryservice.ENUM.WorkOrderStatus;
 import com.keystone.deliveryservice.Entity.Customer;
 import com.keystone.deliveryservice.Entity.Part;
@@ -211,7 +212,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             } else {
                 page = workOrderRepo.findByAssignedToId(currentUser.getId(), pageable);
             }
-        } else {
+        } else if (currentUser.getRole() == Role.MANAGER || currentUser.getRole() == Role.DISPATCHER) {
             // Manager and Dispatcher can view all or filter
             if (customerId != null && status != null) {
                 page = workOrderRepo.findByCustomerIdAndStatus(customerId, status, pageable);
@@ -222,6 +223,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             } else {
                 page = workOrderRepo.findAll(pageable);
             }
+        } else {
+            // Any other role (e.g. HR) has no access to work orders.
+            throw new AccessDeniedException("Your role does not have access to work orders.");
         }
 
         List<WorkOrderResponseDTO> dtoList = page.getContent().stream()
@@ -333,6 +337,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             workOrder.setCompletedAt(now);
         } else if (to == WorkOrderStatus.CLOSED) {
             workOrder.setClosedAt(now);
+            workOrder.setClosedBy(currentUser);
+        } else if (to == WorkOrderStatus.CANCELLED) {
+            workOrder.setCancelledAt(now);
+            workOrder.setCancelledBy(currentUser);
+            workOrder.setCancellationReason(blankToNull(dto.getNote()));
         }
 
         workOrder = workOrderRepo.save(workOrder);
@@ -357,7 +366,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         NotificationService.Ref ref = workOrderRef(workOrder);
         String label = to.name().replace('_', ' ');
         boolean completed = to == WorkOrderStatus.COMPLETED;
-        NotificationType type = completed ? NotificationType.WORK_ORDER_COMPLETED : NotificationType.WORK_ORDER_STATUS;
+        NotificationType type = completed ? NotificationType.WORK_ORDER_COMPLETED
+                : to == WorkOrderStatus.CANCELLED ? NotificationType.WORK_ORDER_CANCELLED : NotificationType.WORK_ORDER_STATUS;
         String staffTitle = completed
                 ? workOrder.getCode() + " completed"
                 : workOrder.getCode() + " is now " + label;
@@ -375,7 +385,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (workOrder.getAssignedTo() != null) {
             notificationService.notifyUser(
                     workOrder.getAssignedTo().getId().equals(actor.getId()) ? null : workOrder.getAssignedTo(),
-                    NotificationType.WORK_ORDER_STATUS, workOrder.getCode() + " is now " + label,
+                    to == WorkOrderStatus.CANCELLED ? NotificationType.WORK_ORDER_CANCELLED : NotificationType.WORK_ORDER_STATUS,
+                    workOrder.getCode() + " is now " + label,
                     actor.getUserName() + " changed \"" + workOrder.getTitle() + "\" to " + label + ".", ref);
         }
     }
@@ -550,9 +561,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                     return;
                 }
                 if (to == WorkOrderStatus.CANCELLED) {
-                    if (role != Role.MANAGER && role != Role.DISPATCHER) {
-                        throw new AccessDeniedException("Only Dispatchers or Managers can cancel work orders.");
-                    }
+                    requireCancelPermission(user, workOrder);
                     return;
                 }
                 break;
@@ -566,9 +575,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                     return;
                 }
                 if (to == WorkOrderStatus.CANCELLED) {
-                    if (role != Role.MANAGER && role != Role.DISPATCHER) {
-                        throw new AccessDeniedException("Only Dispatchers or Managers can cancel work orders.");
-                    }
+                    requireCancelPermission(user, workOrder);
                     return;
                 }
                 break;
@@ -626,7 +633,63 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             if (workOrder.getAssignedTo() == null || !workOrder.getAssignedTo().getId().equals(currentUser.getId())) {
                 throw new AccessDeniedException("Technicians can only view work orders assigned to them.");
             }
+        } else if (currentUser.getRole() != Role.MANAGER && currentUser.getRole() != Role.DISPATCHER) {
+            throw new AccessDeniedException("Your role does not have access to work orders.");
         }
+    }
+
+    /**
+     * Who may cancel a request that has not started yet (NEW or ASSIGNED): managers, dispatchers,
+     * and customers for their own organisation's requests. Once work has started it cannot be cancelled.
+     */
+    private static void requireCancelPermission(UserAuth user, WorkOrder workOrder) {
+        Role role = user.getRole();
+        if (role == Role.MANAGER || role == Role.DISPATCHER) {
+            return;
+        }
+        if (role == Role.CUSTOMER && user.isLinkedTo(workOrder.getCustomer().getId())) {
+            return;
+        }
+        throw new AccessDeniedException("You can only cancel your own organisation's service requests.");
+    }
+
+    static boolean canCancel(WorkOrder workOrder, UserAuth user) {
+        if (workOrder.getStatus() != WorkOrderStatus.NEW && workOrder.getStatus() != WorkOrderStatus.ASSIGNED) {
+            return false;
+        }
+        try {
+            requireCancelPermission(user, workOrder);
+            return true;
+        } catch (AccessDeniedException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public WorkOrderResponseDTO cancelRequest(Long id, String reason, UserAuth currentUser) {
+        WorkOrder workOrder = workOrderRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Work order not found"));
+        // A customer asking about another organisation's request gets the same answer as for a missing one.
+        if (currentUser.getRole() == Role.CUSTOMER && !currentUser.isLinkedTo(workOrder.getCustomer().getId())) {
+            throw new ResourceNotFoundException("Work order not found");
+        }
+        if (workOrder.getStatus() == WorkOrderStatus.CANCELLED) {
+            throw new IllegalStateException(workOrder.getCode() + " is already cancelled.");
+        }
+        if (workOrder.getStatus() != WorkOrderStatus.NEW && workOrder.getStatus() != WorkOrderStatus.ASSIGNED) {
+            throw new IllegalStateException("Work on " + workOrder.getCode() + " has already started ("
+                    + workOrder.getStatus().name().replace('_', ' ') + "), so it can no longer be cancelled. "
+                    + "Please contact KEYSTONE support.");
+        }
+        TransitionStatusDTO transition = new TransitionStatusDTO();
+        transition.setStatus(WorkOrderStatus.CANCELLED);
+        transition.setNote(blankToNull(reason));
+        transitionStatus(id, transition, currentUser);
+        return mapToDTOForUser(workOrderRepo.findById(id).orElseThrow(), currentUser);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void enforceTechnicianAssignment(WorkOrder workOrder, UserAuth currentUser) {
@@ -713,6 +776,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .updatedAt(w.getUpdatedAt())
                 .completedAt(w.getCompletedAt())
                 .closedAt(w.getClosedAt())
+                .closedByName(w.getClosedBy() != null ? w.getClosedBy().getUserName() : null)
+                .cancelledAt(w.getCancelledAt())
+                .cancelledByName(w.getCancelledBy() != null ? w.getCancelledBy().getUserName() : null)
+                .cancellationReason(w.getCancellationReason())
                 .statusHistory(historyDTOs)
                 .partsUsed(partsDTOs)
                 .timeLogs(timeDTOs)
@@ -721,6 +788,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     private WorkOrderResponseDTO mapToDTOForUser(WorkOrder workOrder, UserAuth currentUser) {
         WorkOrderResponseDTO response = mapToDTO(workOrder);
+        response.setCancellable(canCancel(workOrder, currentUser));
         if (currentUser.getRole() != Role.CUSTOMER) {
             return response;
         }

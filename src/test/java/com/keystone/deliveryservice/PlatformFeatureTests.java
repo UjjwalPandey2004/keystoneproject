@@ -38,6 +38,7 @@ import com.keystone.deliveryservice.Entity.WorkOrder;
 import com.keystone.deliveryservice.Repository.PaymentRepository;
 import com.keystone.deliveryservice.Repository.UserAuthRepository;
 import com.keystone.deliveryservice.Repository.WorkOrderRepository;
+import com.keystone.deliveryservice.Security.ResourceNotFoundException;
 import com.keystone.deliveryservice.Service.EmailLogService;
 import com.keystone.deliveryservice.Service.EmailVerificationService;
 import com.keystone.deliveryservice.Service.NotificationService;
@@ -188,10 +189,65 @@ class PlatformFeatureTests {
 
         assertEquals("KS-PAY-001003", service.get(3L, customerA).getReference());
         assertEquals("KS-PAY-001003", service.get(3L, manager()).getReference());
-        assertThrows(AccessDeniedException.class, () -> service.get(3L, customerB));
-        assertThrows(AccessDeniedException.class, () -> service.paidPaymentForReceipt(3L, customerB));
-        assertThrows(AccessDeniedException.class, () -> service.list(UserAuth.builder().id(2L).role(Role.DISPATCHER).build()));
-        assertThrows(AccessDeniedException.class, () -> service.list(UserAuth.builder().id(3L).role(Role.TECHNICIAN).build()));
+        // Another customer's payment answers 404, exactly like a missing one.
+        assertThrows(ResourceNotFoundException.class, () -> service.get(3L, customerB));
+        assertThrows(ResourceNotFoundException.class, () -> service.paidPaymentForReceipt(3L, customerB));
+        assertThrows(ResourceNotFoundException.class, () -> service.get(99L, customerA));
+        for (Role role : List.of(Role.DISPATCHER, Role.TECHNICIAN)) {
+            UserAuth staff = UserAuth.builder().id(2L).role(role).build();
+            assertThrows(AccessDeniedException.class, () -> service.get(3L, staff));
+            assertThrows(AccessDeniedException.class, () -> service.listAll(staff));
+            assertThrows(AccessDeniedException.class, () -> service.listMine(staff));
+        }
+    }
+
+    @Test
+    void customersCannotUseManagerListsOrStatistics() {
+        PaymentService service = service(mock(PaymentRepository.class), mock(WorkOrderRepository.class), "");
+        UserAuth customerA = customerUser(4L, 1L);
+        assertThrows(AccessDeniedException.class, () -> service.listAll(customerA));
+        assertThrows(AccessDeniedException.class, () -> service.stats(customerA));
+        assertThrows(AccessDeniedException.class, () -> service.confirm(3L, customerA));
+        assertThrows(AccessDeniedException.class, () -> service.reject(3L, "x", customerA));
+        // "My payments" belongs to a customer; a manager uses the full list instead.
+        assertThrows(AccessDeniedException.class, () -> service.listMine(manager()));
+        assertThrows(AccessDeniedException.class, () -> service.mySummary(manager()));
+    }
+
+    @Test
+    void managerStatsCoverEveryCustomerAndCustomerSummaryOnlyTheirOwn() {
+        PaymentRepository payments = mock(PaymentRepository.class);
+        UserAuth customerA = customerUser(4L, 1L);
+        UserAuth customerB = customerUser(5L, 2L);
+        Payment aPaidCash = payment(org(1L, "Apex"), customerA, PaymentStatus.PAID);
+        Payment aPendingUpi = payment(org(1L, "Apex"), customerA, PaymentStatus.PENDING);
+        aPendingUpi.setMethod(PaymentMethod.UPI);
+        aPendingUpi.setAmount(new BigDecimal("500.00"));
+        Payment bPaidCard = payment(org(2L, "Birch"), customerB, PaymentStatus.PAID);
+        bPaidCard.setMethod(PaymentMethod.CARD);
+        bPaidCard.setAmount(new BigDecimal("2000.00"));
+        Payment bFailedQr = payment(org(2L, "Birch"), customerB, PaymentStatus.FAILED);
+        bFailedQr.setMethod(PaymentMethod.UPI_QR);
+        when(payments.findAll()).thenReturn(List.of(aPaidCash, aPendingUpi, bPaidCard, bFailedQr));
+        when(payments.findByPayerIdOrderByCreatedAtDesc(4L)).thenReturn(List.of(aPaidCash, aPendingUpi));
+        PaymentService service = service(payments, mock(WorkOrderRepository.class), "");
+
+        var stats = service.stats(manager());
+        assertEquals(new BigDecimal("3500.00"), stats.getTotalRevenue());
+        assertEquals(4, stats.getTotalPayments());
+        assertEquals(1, stats.getCashPayments());
+        assertEquals(1, stats.getUpiPayments());
+        assertEquals(1, stats.getQrPayments());
+        assertEquals(1, stats.getCardPayments());
+        assertEquals(1, stats.getPendingPayments());
+        assertEquals(1, stats.getFailedPayments());
+
+        var mine = service.mySummary(customerA);
+        assertEquals(new BigDecimal("1500.00"), mine.getPaidAmount());
+        assertEquals(new BigDecimal("500.00"), mine.getPendingAmount());
+        assertEquals(new BigDecimal("2000.00"), mine.getTotalAmount());
+        assertEquals(2, mine.getPaymentCount());
+        verify(payments, never()).findByPayerIdOrderByCreatedAtDesc(5L);
     }
 
     @Test
@@ -235,9 +291,9 @@ class PlatformFeatureTests {
         when(payments.findByPayerIdOrderByCreatedAtDesc(6L)).thenReturn(List.of());
         PaymentService service = service(payments, mock(WorkOrderRepository.class), "");
 
-        assertThrows(AccessDeniedException.class, () -> service.get(3L, colleague));
-        assertThrows(AccessDeniedException.class, () -> service.paidPaymentForReceipt(3L, colleague));
-        assertTrue(service.list(colleague).isEmpty());
+        assertThrows(ResourceNotFoundException.class, () -> service.get(3L, colleague));
+        assertThrows(ResourceNotFoundException.class, () -> service.paidPaymentForReceipt(3L, colleague));
+        assertTrue(service.listMine(colleague).isEmpty());
         verify(payments, never()).findByCustomerIdOrderByCreatedAtDesc(anyLong());
     }
 

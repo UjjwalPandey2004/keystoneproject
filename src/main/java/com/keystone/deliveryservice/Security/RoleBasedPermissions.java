@@ -48,6 +48,11 @@ public class RoleBasedPermissions {
                         Permissions.VIEW_DASHBOARD,
                         Permissions.VIEW_REPORTS,
 
+                        Permissions.MANAGE_JOBS,
+                        Permissions.MANAGE_APPLICATIONS,
+                        Permissions.SCHEDULE_INTERVIEWS,
+                        Permissions.VIEW_RESUMES,
+
                         Permissions.SEND_NOTIFICATION
                 )));
 
@@ -85,7 +90,17 @@ public class RoleBasedPermissions {
         
         permission.put(Role.CUSTOMER,
                 new HashSet<>(Arrays.asList(Permissions.RAISE_REQUEST,
-                		                    Permissions.VIEW_OWN_REQUEST
+                		                    Permissions.VIEW_OWN_REQUEST,
+                		                    Permissions.CANCEL_OWN_REQUEST
+                )));
+
+        permission.put(Role.HR,
+                new HashSet<>(Arrays.asList(
+                        Permissions.MANAGE_JOBS,
+                        Permissions.MANAGE_APPLICATIONS,
+                        Permissions.SCHEDULE_INTERVIEWS,
+                        Permissions.VIEW_RESUMES,
+                        Permissions.VIEW_DASHBOARD
                 )));
                 		
         return permission;

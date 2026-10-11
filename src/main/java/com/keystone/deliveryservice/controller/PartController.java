@@ -31,14 +31,14 @@ public class PartController {
 
     @Operation(summary = "List all parts and stock levels")
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
     public ResponseEntity<List<Part>> listParts() {
         return ResponseEntity.ok(partRepo.findAll());
     }
 
     @Operation(summary = "Get part by ID")
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER')")
     public ResponseEntity<Part> getPartById(@PathVariable Long id) {
         Part part = partRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Part not found with ID: " + id));
