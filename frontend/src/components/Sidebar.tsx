@@ -12,7 +12,7 @@ interface SidebarProps {
   onTabChange: (tab: Tab) => void;
 }
 
-const VIEW_ROLES: Role[] = ['MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
+const VIEW_ROLES: Role[] = ['MANAGER', 'HR', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => {
   const { user, role, viewRole, setViewAs, logout } = useAuth();

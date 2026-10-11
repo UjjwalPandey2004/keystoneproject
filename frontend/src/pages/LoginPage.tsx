@@ -18,13 +18,28 @@ const errorMessage = (err: any, fallback: string) => {
   return (fieldError as string) || data?.message || fallback;
 };
 
-const FEATURES = ['Work Order Management', 'Role-Based Access', 'Field Service Operations'];
+const FEATURES = ['Raise and track service requests', 'Certified HVAC, electrical & plumbing technicians', 'Pay online and download receipts'];
 
-export const LoginPage: React.FC = () => {
+export const LoginPage: React.FC<{ initialMode?: 'login' | 'register'; onBack?: () => void }> = ({ initialMode = 'login', onBack }) => {
   const { login } = useAuth();
   const [resetToken] = useState(resetTokenFromUrl);
-  const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'login');
-  const [email, setEmail] = useState('');
+  const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : initialMode);
+  // A visitor who filled in the public request form is told why they are signing in.
+  const [draftNotice] = useState(() => {
+    try {
+      return sessionStorage.getItem('keystone_request_draft') ? 'Sign in or create a free account to submit your service request. Your details are saved.' : null;
+    } catch {
+      return null;
+    }
+  });
+  // Start with the email typed into the website's request card, if any.
+  const [email, setEmail] = useState(() => {
+    try {
+      return (JSON.parse(sessionStorage.getItem('keystone_request_draft') || '{}').email as string) || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [name, setName] = useState('');
@@ -52,7 +67,7 @@ export const LoginPage: React.FC = () => {
     setShowPassword(false);
     setOtp('');
     if (next === 'login' && window.location.pathname !== '/') {
-      window.history.replaceState(null, '', '/');
+      window.history.replaceState(null, '', '/#/login');
     }
   };
 
@@ -236,7 +251,7 @@ export const LoginPage: React.FC = () => {
           <h1 className="kl-brand-name">KEYSTONE</h1>
           <p className="kl-brand-tagline">Field Service Management Platform</p>
           <p className="kl-brand-desc">
-            Commercial facilities maintenance and field-service platform for Meridian Facilities Management.
+            Keystone Maintenance Solutions: HVAC, electrical and plumbing maintenance with live request tracking.
           </p>
           <ul className="kl-features">
             {FEATURES.map((feature) => (
@@ -250,6 +265,9 @@ export const LoginPage: React.FC = () => {
 
         {/* Right: login card */}
         <section className="kl-card">
+          {onBack && (
+            <button type="button" className="kl-link kl-back" onClick={onBack}><ArrowLeft size={14} /> Back to website</button>
+          )}
           <div className="kl-card-brand">
             <KeystoneLogo size={52} />
             <span>KEYSTONE</span>
@@ -258,6 +276,12 @@ export const LoginPage: React.FC = () => {
           <h2 className="kl-title">{heading[mode].title}</h2>
           <p className="kl-subtitle">{heading[mode].sub}</p>
 
+          {draftNotice && !notice && !error && (mode === 'login' || mode === 'register') && (
+            <div className="kl-alert kl-alert-ok" role="status">
+              <CheckCircle2 size={16} />
+              <span>{draftNotice}</span>
+            </div>
+          )}
           {error && (
             <div className="kl-alert kl-alert-error" role="alert">
               <AlertCircle size={16} />
@@ -364,7 +388,9 @@ export const LoginPage: React.FC = () => {
 
           <div className="kl-footer">
             {mode === 'login' ? (
-              <span>Don't have an account? <button type="button" className="kl-link kl-link-underline" onClick={() => switchMode('register')}>Register here</button></span>
+              <span>Don't have an account? <button type="button" className="kl-link kl-link-underline" onClick={() => switchMode('register')}>Sign up</button></span>
+            ) : mode === 'register' ? (
+              <span>Already have an account? <button type="button" className="kl-link kl-link-underline" onClick={() => switchMode('login')}>Sign in</button></span>
             ) : (
               <button type="button" className="kl-link" onClick={() => switchMode('login')}><ArrowLeft size={14} /> Back to Sign In</button>
             )}

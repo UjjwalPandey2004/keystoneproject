@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
-import { LoginPage } from './pages/LoginPage';
+import { PublicSite } from './pages/PublicSite';
+import { ApplicationsPage, HireNowPage, HrDashboard, InterviewsPage, JobsPage } from './pages/HrPages';
 import { HomeDashboard } from './pages/HomeDashboard';
 import { ProfilePage } from './pages/ProfilePage';
 import { DispatcherBoard } from './pages/DispatcherBoard';
@@ -50,8 +51,9 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, tab, currentTab]);
 
+  // Visitors get the public website (home, services, careers, login and sign-up).
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return <PublicSite />;
   }
 
   return (
@@ -61,7 +63,7 @@ const App: React.FC = () => {
         <Sidebar currentTab={tab} onTabChange={goTo} />
         <main className="ks-content">
           <div className="ks-content-inner" key={`${viewRole}-${tab}`}>
-            {tab === 'home' && <HomeDashboard onTabChange={goTo} />}
+            {tab === 'home' && (viewRole === 'HR' ? <HrDashboard onTabChange={goTo} /> : <HomeDashboard onTabChange={goTo} />)}
             {tab === 'profile' && <ProfilePage />}
             {tab === 'reports' && <ManagerDashboard />}
             {tab === 'board' && <DispatcherBoard />}
@@ -78,6 +80,10 @@ const App: React.FC = () => {
             {tab === 'tasks' && <MyTasksPage onTabChange={goTo} />}
             {tab === 'payments' && <PaymentsPage />}
             {tab === 'mypayments' && <MyPaymentsPage />}
+            {tab === 'hire' && <HireNowPage />}
+            {tab === 'jobs' && <JobsPage onTabChange={goTo} />}
+            {tab === 'applications' && <ApplicationsPage />}
+            {tab === 'interviews' && <InterviewsPage />}
           </div>
         </main>
       </div>

@@ -184,7 +184,7 @@ export const TechnicianFieldView: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {jobs.map((job) => (
-            <div key={job.id} className="card" style={{ borderLeft: `5px solid ${job.status === 'IN_PROGRESS' ? '#f59e0b' : job.status === 'COMPLETED' ? '#10b981' : '#6366f1'}` }}>
+            <div key={job.id} className="card" style={{ borderLeft: `5px solid ${job.status === 'IN_PROGRESS' ? '#eab308' : job.status === 'COMPLETED' ? '#10b981' : 'var(--ks-accent)'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="ks-code">{job.code}</span>

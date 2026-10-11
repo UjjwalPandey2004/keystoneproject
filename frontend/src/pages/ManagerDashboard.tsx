@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportApi, workOrderApi } from '../services/api';
 import { DashboardMetrics, WorkOrder } from '../types';
+import { ExportPanel } from '../components/ExportPanel';
 import { Activity, AlertTriangle, CheckCircle2, Clock, Gauge, PlusCircle, RefreshCw, Timer } from 'lucide-react';
 
 export const ManagerDashboard: React.FC = () => {
@@ -50,8 +51,8 @@ export const ManagerDashboard: React.FC = () => {
 
   const statusRows: { key: keyof DashboardMetrics; label: string; color: string }[] = [
     { key: 'newOrders', label: 'New', color: '#3b82f6' },
-    { key: 'assignedOrders', label: 'Assigned', color: '#8b5cf6' },
-    { key: 'inProgressOrders', label: 'In Progress', color: '#f59e0b' },
+    { key: 'assignedOrders', label: 'Assigned', color: '#0ea5e9' },
+    { key: 'inProgressOrders', label: 'In Progress', color: '#eab308' },
     { key: 'onHoldOrders', label: 'On Hold', color: 'var(--ks-warning-text)' },
     { key: 'completedOrders', label: 'Completed', color: '#10b981' },
     { key: 'closedOrders', label: 'Closed', color: 'var(--ks-muted)' },
@@ -69,6 +70,8 @@ export const ManagerDashboard: React.FC = () => {
           <RefreshCw size={16} /> Refresh Metrics
         </button>
       </div>
+
+      <ExportPanel />
 
       {/* Top KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -105,7 +108,7 @@ export const ManagerDashboard: React.FC = () => {
                 style={{
                   height: '100%',
                   width: `${Math.min(100, metrics.slaCompliancePercentage)}%`,
-                  background: metrics.slaCompliancePercentage >= 85 ? '#10b981' : metrics.slaCompliancePercentage >= 60 ? '#f59e0b' : '#ef4444',
+                  background: metrics.slaCompliancePercentage >= 85 ? '#10b981' : metrics.slaCompliancePercentage >= 60 ? '#eab308' : '#ef4444',
                   borderRadius: 9999,
                 }}
               />

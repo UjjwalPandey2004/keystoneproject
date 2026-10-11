@@ -1,14 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Download, RefreshCw, X, XCircle } from 'lucide-react';
+import { Banknote, Check, CreditCard, Download, QrCode, RefreshCw, Smartphone, X, XCircle } from 'lucide-react';
 import { apiError, paymentApi } from '../services/api';
-import { Payment, PaymentStatus } from '../types';
+import { Payment, PaymentMethod, PaymentStats, PaymentStatus } from '../types';
 import { formatMoney, methodText, PaymentReceipt } from '../components/PaymentReceipt';
 
 type Filter = 'ALL' | PaymentStatus;
 
+const METHOD_ICON: Record<PaymentMethod, React.ReactNode> = {
+  CASH: <Banknote size={13} />, UPI: <Smartphone size={13} />, UPI_QR: <QrCode size={13} />, CARD: <CreditCard size={13} />,
+};
+
+const MethodBadge: React.FC<{ payment: Payment }> = ({ payment }) => (
+  <span className={`badge badge-method-${payment.method.toLowerCase()}`} style={{ whiteSpace: 'nowrap' }}>
+    <span aria-hidden="true" style={{ display: 'inline-flex', verticalAlign: '-2px' }}>{METHOD_ICON[payment.method]}</span> {methodText(payment)}
+  </span>
+);
+
 // Manager view: every payment customers made. Managers confirm or reject; they never pay.
 export const PaymentsPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [stats, setStats] = useState<PaymentStats | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -16,17 +27,22 @@ export const PaymentsPage: React.FC = () => {
   const [reason, setReason] = useState('');
   const [receipt, setReceipt] = useState<Payment | null>(null);
 
+  // Totals are computed by the server; re-read them whenever a payment changes.
+  const loadStats = () => paymentApi.stats().then(setStats).catch(() => setStats(null));
+
   const load = () => {
     setLoading(true);
-    paymentApi.list()
-      .then(setPayments)
+    Promise.all([paymentApi.list().then(setPayments), loadStats()])
       .catch((err) => setMessage({ ok: false, text: apiError(err, 'Unable to load payments.') }))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
-  const replace = (updated: Payment) => setPayments((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+  const replace = (updated: Payment) => {
+    setPayments((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+    loadStats();
+  };
 
   const confirm = async (p: Payment) => {
     const detail = p.method === 'CASH' ? 'the cash was received' : p.method === 'CARD' ? 'the card payment appears on the card-machine settlement' : `UPI reference ${p.transactionRef} is in your bank statement`;
@@ -60,15 +76,25 @@ export const PaymentsPage: React.FC = () => {
     }
   };
 
-  const sum = (status: PaymentStatus) => payments.filter((p) => p.status === status).reduce((s, p) => s + Number(p.amount), 0);
   const shown = filter === 'ALL' ? payments : payments.filter((p) => p.status === filter);
+
+  const tiles: { label: string; value: string | number; sub?: string }[] = stats ? [
+    { label: 'Total revenue', value: formatMoney(stats.totalRevenue), sub: `${stats.paidPayments} confirmed` },
+    { label: 'Total payments', value: stats.totalPayments },
+    { label: 'Cash payments', value: stats.cashPayments, sub: `${formatMoney(stats.cashRevenue)} received` },
+    { label: 'UPI payments', value: stats.upiPayments, sub: `${formatMoney(stats.upiRevenue)} received` },
+    { label: 'QR payments', value: stats.qrPayments, sub: `${formatMoney(stats.qrRevenue)} received` },
+    { label: 'Card payments', value: stats.cardPayments, sub: `${formatMoney(stats.cardRevenue)} received` },
+    { label: 'Pending payments', value: stats.pendingPayments, sub: `${formatMoney(stats.pendingAmount)} waiting` },
+    { label: 'Failed payments', value: stats.failedPayments, sub: `${stats.cancelledPayments} cancelled by customers` },
+  ] : [];
 
   return (
     <div>
       <div className="ks-toolbar">
         <div>
-          <h2 className="ks-page-title">Payments</h2>
-          <p className="ks-page-sub">Payments made by customers (UPI, UPI QR, card, cash). Confirm each one once the money has arrived.</p>
+          <h2 className="ks-page-title">Payment Management</h2>
+          <p className="ks-page-sub">Every payment made by customers (cash, UPI, QR, card). Confirm each one once the money has arrived.</p>
         </div>
         <button className="btn btn-secondary" onClick={load}><RefreshCw size={15} /> Refresh</button>
       </div>
@@ -76,9 +102,13 @@ export const PaymentsPage: React.FC = () => {
       {message && <div className={`ks-alert ${message.ok ? 'ks-alert-success' : 'ks-alert-error'}`}>{message.text}</div>}
 
       <div className="ks-grid" style={{ marginBottom: 20 }}>
-        <div className="ks-card"><div className="ks-tile-value">{formatMoney(sum('PAID'))}</div><div className="ks-tile-title">Received</div></div>
-        <div className="ks-card"><div className="ks-tile-value">{formatMoney(sum('PENDING'))}</div><div className="ks-tile-title">Pending ({payments.filter((p) => p.status === 'PENDING').length})</div></div>
-        <div className="ks-card"><div className="ks-tile-value">{payments.filter((p) => p.status === 'FAILED').length}</div><div className="ks-tile-title">Failed</div></div>
+        {tiles.map((t) => (
+          <div className="ks-card" key={t.label}>
+            <div className="ks-tile-value">{t.value}</div>
+            <div className="ks-tile-title">{t.label}</div>
+            {t.sub && <div className="ks-dim" style={{ fontSize: '0.78rem', marginTop: 4 }}>{t.sub}</div>}
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -97,28 +127,29 @@ export const PaymentsPage: React.FC = () => {
         <div className="ks-table-wrap">
           <table className="ks-table">
             <thead>
-              <tr><th>Customer name</th><th>Problem / work order</th><th>Amount paid</th><th>Method</th><th>Status</th><th>Transaction / reference</th><th>Date</th><th>Actions</th></tr>
+              <tr><th>Payment ID</th><th>Customer</th><th>Service</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Date</th><th>Action</th></tr>
             </thead>
             <tbody>
               {shown.map((p) => (
                 <tr key={p.id}>
+                  <td><strong>{p.reference}</strong><div className="ks-dim" style={{ fontSize: '0.74rem' }}>#{p.id}</div></td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{p.payerName}</div>
-                    <div className="ks-dim" style={{ fontSize: '0.78rem' }}>{p.customerName}</div>
+                    <div className="ks-dim" style={{ fontSize: '0.78rem' }}>{p.customerName} · ID {p.customerId}</div>
                     <div className="ks-muted" style={{ fontSize: '0.78rem' }}>{p.payerEmail}</div>
                     <div className="ks-muted" style={{ fontSize: '0.78rem' }}>{p.payerPhone || 'No phone'}</div>
                   </td>
                   <td><span className="ks-code">{p.workOrderCode}</span><div style={{ fontWeight: 600 }}>{p.workOrderTitle}</div>{p.workOrderDescription && <div className="ks-dim" style={{ fontSize: '0.76rem', maxWidth: 240 }}>{p.workOrderDescription}</div>}</td>
                   <td><strong>{formatMoney(p.amount, p.currency)}</strong></td>
-                  <td>{methodText(p)}</td>
+                  <td><MethodBadge payment={p} /></td>
+                  <td>
+                    {p.transactionRef ? <span className="ks-code">{p.transactionRef}</span>
+                      : <span className="ks-muted" style={{ fontSize: '0.78rem' }}>{p.method === 'CASH' ? 'Not needed (cash)' : 'Not entered yet'}</span>}
+                  </td>
                   <td>
                     <span className={`badge badge-${p.status.toLowerCase()}`}>{p.status}</span>
                     {p.failureReason && <div className="ks-danger-text" style={{ fontSize: '0.76rem', marginTop: 4 }}>{p.failureReason}</div>}
-                    {p.verifiedByName && <div className="ks-dim" style={{ fontSize: '0.74rem', marginTop: 4 }}>confirmed by {p.verifiedByName}</div>}
-                  </td>
-                  <td>
-                    <div><strong>{p.reference}</strong></div>
-                    <div className="ks-muted" style={{ fontSize: '0.78rem' }}>{p.transactionRef ? `Ref ${p.transactionRef}` : p.method === 'CASH' ? 'Cash' : 'Reference not entered yet'}</div>
+                    {p.verifiedByName && <div className="ks-dim" style={{ fontSize: '0.74rem', marginTop: 4 }}>by {p.verifiedByName}</div>}
                   </td>
                   <td className="ks-muted" style={{ whiteSpace: 'nowrap' }}>
                     {new Date(p.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}

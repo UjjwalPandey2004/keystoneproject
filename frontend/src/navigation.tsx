@@ -1,13 +1,14 @@
 import React from 'react';
 import {
-  BarChart3, Bell, Building, CalendarCheck, ClipboardList, CreditCard, HardHat, LayoutDashboard, ListChecks, MapPin, Truck,
-  User as UserIcon, Users, Wrench,
+  BarChart3, Bell, Briefcase, Building, CalendarCheck, CalendarClock, ClipboardList, CreditCard, FileText, HardHat, LayoutDashboard,
+  ListChecks, MapPin, Truck, User as UserIcon, UserPlus, Users, Wrench,
 } from 'lucide-react';
 import { Role } from './types';
 
 export type Tab =
   | 'home' | 'reports' | 'board' | 'field' | 'customers' | 'customer' | 'users' | 'profile'
-  | 'deliveries' | 'payments' | 'mypayments' | 'notifications' | 'technicians' | 'tasks' | 'staff' | 'attendance';
+  | 'deliveries' | 'payments' | 'mypayments' | 'notifications' | 'technicians' | 'tasks' | 'staff' | 'attendance'
+  | 'hire' | 'jobs' | 'applications' | 'interviews';
 
 export interface NavItem {
   tab: Tab;
@@ -30,7 +31,8 @@ export const navForRole = (role: Role | null): NavItem[] => {
         item('staff', 'Staff', <Users size={18} />),
         item('board', 'Work Orders', <ClipboardList size={18} />),
         item('deliveries', 'Deliveries', <Truck size={18} />),
-        item('payments', 'Payments', <CreditCard size={18} />),
+        item('payments', 'Payment Management', <CreditCard size={18} />),
+        item('applications', 'Recruitment', <FileText size={18} />),
         item('attendance', 'Attendance', <CalendarCheck size={18} />),
         notifications,
         item('reports', 'Reports', <BarChart3 size={18} />),
@@ -53,6 +55,16 @@ export const navForRole = (role: Role | null): NavItem[] => {
         notifications,
         profile,
       ];
+    case 'HR':
+      return [
+        dashboard,
+        item('hire', 'Hire Now', <UserPlus size={18} />),
+        item('jobs', 'Job Openings', <Briefcase size={18} />),
+        item('applications', 'Applications', <FileText size={18} />),
+        item('interviews', 'Interviews', <CalendarClock size={18} />),
+        notifications,
+        profile,
+      ];
     case 'CUSTOMER':
       return [
         dashboard,
@@ -69,7 +81,7 @@ export const navForRole = (role: Role | null): NavItem[] => {
 // Pages a role may open that are reached from the dashboard rather than the sidebar.
 const extraTabs: Partial<Record<Role, Tab[]>> = {
   DISPATCHER: ['customers'],
-  MANAGER: ['field', 'technicians', 'users'],
+  MANAGER: ['field', 'technicians', 'users', 'hire', 'jobs', 'interviews'],
 };
 
 export const isTabAllowed = (role: Role | null, tab: Tab) =>

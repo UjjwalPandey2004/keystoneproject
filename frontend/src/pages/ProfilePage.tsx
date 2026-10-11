@@ -206,7 +206,7 @@ export const ProfilePage: React.FC = () => {
         <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', alignItems: 'start' }}>
           <div className="ks-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 18, flexWrap: 'wrap' }}>
-              <div className="ks-avatar" style={{ width: 84, height: 84, fontSize: 30, boxShadow: '0 10px 28px rgba(99, 102, 241, 0.45)' }}>
+              <div className="ks-avatar" style={{ width: 84, height: 84, fontSize: 30, boxShadow: '0 10px 28px rgba(var(--ks-accent-rgb), 0.4)' }}>
                 {initials(profile.userName)}
               </div>
               <div>

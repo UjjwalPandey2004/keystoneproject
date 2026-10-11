@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { Banknote, CreditCard, ExternalLink, FileText, QrCode, RefreshCw, Smartphone, X } from 'lucide-react';
 import { apiError, paymentApi, workOrderApi } from '../services/api';
-import { Payment, PaymentConfig, PaymentMethod, UpiApp, WorkOrder } from '../types';
+import { MyPaymentSummary, Payment, PaymentConfig, PaymentMethod, UpiApp, WorkOrder } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, methodText, PaymentReceipt, UPI_APP_LABEL } from '../components/PaymentReceipt';
 
@@ -38,6 +38,7 @@ export const MyPaymentsPage: React.FC = () => {
   const { role } = useAuth();
   const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [summary, setSummary] = useState<MyPaymentSummary | null>(null);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -57,9 +58,17 @@ export const MyPaymentsPage: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [cfg, list, wo] = await Promise.all([paymentApi.config(), paymentApi.list(), workOrderApi.list({ size: 100 })]);
+      // Only a customer has "my payments"; a manager previewing this screen gets an empty one.
+      const isCustomer = role === 'CUSTOMER';
+      const [cfg, list, totals, wo] = await Promise.all([
+        paymentApi.config(),
+        isCustomer ? paymentApi.mine() : Promise.resolve([]),
+        isCustomer ? paymentApi.mySummary() : Promise.resolve(null),
+        workOrderApi.list({ size: 100 }),
+      ]);
       setConfig(cfg);
       setPayments(list);
+      setSummary(totals);
       setOrders(wo.content || []);
       if (!cfg.upiEnabled) setMethod('CASH');
     } catch (err) {
@@ -73,15 +82,17 @@ export const MyPaymentsPage: React.FC = () => {
     load();
   }, []);
 
+  // Totals come from the server, so they are re-read after a payment is started or cancelled.
+  const refreshSummary = () => {
+    if (role === 'CUSTOMER') paymentApi.mySummary().then(setSummary).catch(() => {});
+  };
+
   // Work orders that can be paid now: not cancelled and without a pending payment.
   const payable = useMemo(() => {
     const pending = new Set(payments.filter((p) => p.status === 'PENDING').map((p) => p.workOrderId));
     return orders.filter((o) => o.status !== 'CANCELLED' && !pending.has(o.id));
   }, [orders, payments]);
   const selected = orders.find((o) => o.id === workOrderId) || null;
-
-  const paidTotal = payments.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + Number(p.amount), 0);
-  const pendingTotal = payments.filter((p) => p.status === 'PENDING').reduce((sum, p) => sum + Number(p.amount), 0);
 
   const startPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,6 +111,7 @@ export const MyPaymentsPage: React.FC = () => {
         upiApp: method === 'UPI' ? upiApp : undefined,
       });
       setPayments((list) => [created, ...list]);
+      refreshSummary();
       setWorkOrderId('');
       setAmount('');
       setReference('');
@@ -134,6 +146,7 @@ export const MyPaymentsPage: React.FC = () => {
     if (!window.confirm(`Cancel payment ${payment.reference}?`)) return;
     try {
       replace(await paymentApi.cancel(payment.id));
+      refreshSummary();
       if (active?.id === payment.id) setActive(null);
       setMessage({ ok: true, text: `${payment.reference} cancelled.` });
     } catch (err) {
@@ -164,9 +177,9 @@ export const MyPaymentsPage: React.FC = () => {
       {message && <div className={`ks-alert ${message.ok ? 'ks-alert-success' : 'ks-alert-error'}`}>{message.text}</div>}
 
       <div className="ks-grid" style={{ marginBottom: 20 }}>
-        <div className="ks-card"><div className="ks-tile-value">{formatMoney(paidTotal)}</div><div className="ks-tile-title">Paid</div></div>
-        <div className="ks-card"><div className="ks-tile-value">{formatMoney(pendingTotal)}</div><div className="ks-tile-title">Waiting for confirmation</div></div>
-        <div className="ks-card"><div className="ks-tile-value">{payments.length}</div><div className="ks-tile-title">Payments</div></div>
+        <div className="ks-card"><div className="ks-tile-value">{formatMoney(summary?.totalAmount ?? 0)}</div><div className="ks-tile-title">Total my payments</div></div>
+        <div className="ks-card"><div className="ks-tile-value">{formatMoney(summary?.paidAmount ?? 0)}</div><div className="ks-tile-title">My paid amount</div></div>
+        <div className="ks-card"><div className="ks-tile-value">{formatMoney(summary?.pendingAmount ?? 0)}</div><div className="ks-tile-title">My pending amount ({summary?.pendingCount ?? 0})</div></div>
       </div>
 
       <form className="ks-card" onSubmit={startPayment}>
@@ -254,7 +267,7 @@ export const MyPaymentsPage: React.FC = () => {
         ) : (
           <div className="ks-table-wrap">
             <table className="ks-table">
-              <thead><tr><th>Reference</th><th>Problem</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th><th /></tr></thead>
+              <thead><tr><th>Payment ID</th><th>Problem</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th><th /></tr></thead>
               <tbody>
                 {payments.map((p) => (
                   <tr key={p.id}>

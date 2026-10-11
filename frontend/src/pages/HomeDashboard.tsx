@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, BarChart3, Bell, Building, CheckCircle2, ClipboardList, CreditCard, HardHat, ListChecks, MapPin, PauseCircle, Truck, User as UserIcon, Users, Wrench } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, Bell, Briefcase, Building, CheckCircle2, ClipboardList, CreditCard, HardHat, ListChecks, MapPin, PauseCircle, Truck, User as UserIcon, Users, Wrench } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customerApi, paymentApi, reportApi, userApi, workOrderApi } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
@@ -43,16 +43,16 @@ export const HomeDashboard: React.FC<Props> = ({ onTabChange }) => {
 
         const more: Record<string, number | string> = {};
         if (role === 'MANAGER') {
-          const [customers, users, summary, payments, techs] = await Promise.all([
-            customerApi.getAll(), userApi.list(), reportApi.getSummary(), paymentApi.list(), userApi.getTechnicians(),
+          const [customers, users, summary, payStats, techs] = await Promise.all([
+            customerApi.getAll(), userApi.list(), reportApi.getSummary(), paymentApi.stats(), userApi.getTechnicians(),
           ]);
           more.customers = customers.length;
           more.workers = users.filter((u) => u.role === 'TECHNICIAN').length;
           more.users = users.length;
           more.sla = `${summary.slaCompliancePercentage}%`;
           more.overdue = summary.overdueOrders;
-          more.pendingPayments = payments.filter((p) => p.status === 'PENDING').length;
-          more.received = formatMoney(payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + Number(p.amount), 0));
+          more.pendingPayments = payStats.pendingPayments;
+          more.received = formatMoney(payStats.totalRevenue);
           more.availableTechs = techs.filter((t) => t.available).length;
         } else if (role === 'DISPATCHER') {
           const [customers, techs] = await Promise.all([customerApi.getAll(), userApi.getTechnicians()]);
@@ -67,9 +67,10 @@ export const HomeDashboard: React.FC<Props> = ({ onTabChange }) => {
           } catch {
             more.sites = 0;
           }
-          const payments = await paymentApi.list().catch(() => []);
-          more.pendingPayments = payments.filter((p) => p.status === 'PENDING').length;
-          more.paid = formatMoney(payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + Number(p.amount), 0));
+          // Only this customer's own totals, worked out by the server.
+          const mySummary = await paymentApi.mySummary().catch(() => null);
+          more.pendingPayments = mySummary?.pendingCount ?? 0;
+          more.paid = formatMoney(mySummary?.paidAmount ?? 0);
         }
         setExtra(more);
         setError('');
@@ -91,7 +92,8 @@ export const HomeDashboard: React.FC<Props> = ({ onTabChange }) => {
       { title: 'Staff', value: extra.workers, desc: `Technicians · ${extra.users ?? 0} accounts in total`, icon: <Users size={22} />, tab: 'staff' },
       { title: 'Work Orders', value: open, desc: `Open of ${totalOrders} total`, icon: <ClipboardList size={22} />, tab: 'board' },
       { title: 'Deliveries', value: count('ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'), desc: `${count('IN_PROGRESS')} technicians on site now`, icon: <Truck size={22} />, tab: 'deliveries' },
-      { title: 'Payments', value: extra.received, desc: `Received · ${extra.pendingPayments ?? 0} waiting for confirmation`, icon: <CreditCard size={22} />, tab: 'payments' },
+      { title: 'Payment Management', value: extra.received, desc: `Total revenue · ${extra.pendingPayments ?? 0} waiting for confirmation`, icon: <CreditCard size={22} />, tab: 'payments' },
+      { title: 'Recruitment', desc: 'Job openings, applications, interviews and hiring', icon: <Briefcase size={22} />, tab: 'applications' },
       { title: 'Notifications', value: unread, desc: 'Unread organisation and payment updates', icon: <Bell size={22} />, tab: 'notifications' },
       { title: 'Reports', value: extra.sla, desc: `SLA compliance · ${extra.overdue ?? 0} overdue`, icon: <BarChart3 size={22} />, tab: 'reports' },
       { title: 'Profile', desc: 'Your account details', icon: <UserIcon size={22} />, tab: 'profile' },
@@ -115,7 +117,7 @@ export const HomeDashboard: React.FC<Props> = ({ onTabChange }) => {
     CUSTOMER: [
       { title: 'My Services', value: extra.sites, desc: extra.organisation ? `Sites of ${extra.organisation}` : 'Service sites of your organisation', icon: <MapPin size={22} />, tab: 'customer' },
       { title: 'Service Status', value: open, desc: `Open of ${totalOrders} service requests`, icon: <ClipboardList size={22} />, tab: 'customer' },
-      { title: 'My Payments', value: extra.paid, desc: `Paid · ${extra.pendingPayments ?? 0} waiting for confirmation`, icon: <CreditCard size={22} />, tab: 'mypayments' },
+      { title: 'My Payments', value: extra.paid, desc: `My paid amount · ${extra.pendingPayments ?? 0} waiting for confirmation`, icon: <CreditCard size={22} />, tab: 'mypayments' },
       { title: 'Notifications', value: unread, desc: 'Unread service and payment updates', icon: <Bell size={22} />, tab: 'notifications' },
       { title: 'Profile', desc: 'Your account details', icon: <UserIcon size={22} />, tab: 'profile' },
     ],

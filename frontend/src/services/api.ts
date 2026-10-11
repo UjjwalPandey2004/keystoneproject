@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { AppNotification, Attachment, AttendanceRecord, AttendanceStatus, Customer, CustomerAccount, StaffMember, DashboardMetrics, Part, Payment, PaymentConfig, PaymentMethod, Site, UpiApp, User, WorkOrder, WorkOrderStatus } from '../types';
+import { AppNotification, Attachment, AttendanceRecord, AttendanceStatus, Customer, CustomerAccount, StaffMember, DashboardMetrics, MyPaymentSummary, Part, Payment, PaymentConfig, PaymentMethod, PaymentStats, Site, UpiApp, User, WorkOrder, WorkOrderStatus,
+  ApplicationForm, ApplicationStatus, HrStats, Interview, InterviewInput, JobApplication, JobOpening, JobOpeningInput, Role } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -170,6 +171,11 @@ export const workOrderApi = {
     const res = await api.post<WorkOrder>(`/api/work-orders/${id}/status`, { status, note });
     return res.data;
   },
+  // Cancel a request that has not started yet (customers: own organisation only).
+  cancel: async (id: number, reason?: string) => {
+    const res = await api.post<WorkOrder>(`/api/work-orders/${id}/cancel`, { reason: reason || undefined });
+    return res.data;
+  },
   logParts: async (id: number, partId: number, quantity: number) => {
     const res = await api.post(`/api/work-orders/${id}/parts`, { partId, quantity });
     return res.data;
@@ -243,8 +249,23 @@ export const paymentApi = {
     const res = await api.get<PaymentConfig>('/api/payments/config');
     return res.data;
   },
+  // Manager only: every customer's payments.
   list: async () => {
     const res = await api.get<Payment[]>('/api/payments');
+    return res.data;
+  },
+  // Manager only: company-wide totals.
+  stats: async () => {
+    const res = await api.get<PaymentStats>('/api/payments/stats');
+    return res.data;
+  },
+  // Customer only: the backend picks the customer from the login token.
+  mine: async () => {
+    const res = await api.get<Payment[]>('/api/payments/my');
+    return res.data;
+  },
+  mySummary: async () => {
+    const res = await api.get<MyPaymentSummary>('/api/payments/my/summary');
     return res.data;
   },
   // Customers only: starts a PENDING payment that a manager later confirms.
@@ -333,4 +354,69 @@ export const attendanceApi = {
   },
   checkIn: async () => (await api.post<AttendanceRecord>('/api/attendance/check-in')).data,
   checkOut: async () => (await api.post<AttendanceRecord>('/api/attendance/check-out')).data,
+};
+
+// CSV exports (open in Excel). The server applies the same role checks as the dashboards.
+const downloadCsv = async (url: string, fileName: string, params?: Record<string, string | undefined>) => {
+  const clean = Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v));
+  const res = await api.get(url, { params: clean, responseType: 'blob' });
+  saveBlob(res.data, fileName);
+};
+
+export const exportApi = {
+  workOrders: (from?: string, to?: string) => downloadCsv('/api/reports/export/work-orders', 'keystone-work-orders.csv', { from, to }),
+  payments: (from?: string, to?: string) => downloadCsv('/api/reports/export/payments', 'keystone-payments.csv', { from, to }),
+  technicianWorkload: (from?: string, to?: string) =>
+    downloadCsv('/api/reports/export/technician-workload', 'keystone-technician-workload.csv', { from, to }),
+  applications: () => downloadCsv('/api/hr/export/applications', 'keystone-applications.csv'),
+  interviews: () => downloadCsv('/api/hr/export/interviews', 'keystone-interviews.csv'),
+};
+
+const applicationFormData = (form: ApplicationForm, resume: File) => {
+  const data = new FormData();
+  Object.entries(form).forEach(([key, value]) => { if (value) data.append(key, value); });
+  data.append('resume', resume);
+  return data;
+};
+
+// Recruitment for HR and managers.
+export const hrApi = {
+  stats: async () => (await api.get<HrStats>('/api/hr/stats')).data,
+  jobs: async () => (await api.get<JobOpening[]>('/api/hr/jobs')).data,
+  createJob: async (input: JobOpeningInput) => (await api.post<JobOpening>('/api/hr/jobs', input)).data,
+  updateJob: async (id: number, input: JobOpeningInput) => (await api.put<JobOpening>(`/api/hr/jobs/${id}`, input)).data,
+  publishJob: async (id: number) => (await api.post<JobOpening>(`/api/hr/jobs/${id}/publish`)).data,
+  closeJob: async (id: number) => (await api.post<JobOpening>(`/api/hr/jobs/${id}/close`)).data,
+  applications: async (params?: { jobId?: number; status?: ApplicationStatus; search?: string }) =>
+    (await api.get<JobApplication[]>('/api/hr/applications', { params })).data,
+  application: async (id: number) => (await api.get<JobApplication>(`/api/hr/applications/${id}`)).data,
+  addApplication: async (jobId: number, form: ApplicationForm, resume: File) =>
+    (await api.post<JobApplication>(`/api/hr/jobs/${jobId}/applications`, applicationFormData(form, resume), {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data,
+  updateApplication: async (id: number, data: { phone?: string; experience?: string; skills?: string; education?: string; internalNotes?: string }) =>
+    (await api.put<JobApplication>(`/api/hr/applications/${id}`, data)).data,
+  changeStatus: async (id: number, status: ApplicationStatus, note?: string) =>
+    (await api.post<JobApplication>(`/api/hr/applications/${id}/status`, { status, note: note || undefined })).data,
+  downloadResume: async (application: JobApplication) => {
+    const res = await api.get(`/api/hr/applications/${application.id}/resume`, { responseType: 'blob' });
+    saveBlob(res.data, application.resumeFileName);
+  },
+  createEmployeeAccount: async (id: number, data: { role: Role; initialPassword: string; location?: string }) =>
+    (await api.post<JobApplication>(`/api/hr/applications/${id}/employee-account`, data)).data,
+  interviews: async (upcoming = false) => (await api.get<Interview[]>('/api/hr/interviews', { params: { upcoming } })).data,
+  scheduleInterview: async (applicationId: number, input: InterviewInput) =>
+    (await api.post<Interview>(`/api/hr/applications/${applicationId}/interviews`, input)).data,
+  rescheduleInterview: async (id: number, input: InterviewInput) => (await api.put<Interview>(`/api/hr/interviews/${id}`, input)).data,
+  cancelInterview: async (id: number, reason?: string) =>
+    (await api.post<Interview>(`/api/hr/interviews/${id}/cancel`, { reason: reason || undefined })).data,
+  completeInterview: async (id: number) => (await api.post<Interview>(`/api/hr/interviews/${id}/complete`)).data,
+};
+
+// Public careers page (no login).
+export const careersApi = {
+  jobs: async () => (await api.get<JobOpening[]>('/api/public/jobs')).data,
+  apply: async (jobId: number, form: ApplicationForm, resume: File) =>
+    (await api.post<{ reference: string; jobTitle: string; message: string }>(`/api/public/jobs/${jobId}/applications`,
+      applicationFormData(form, resume), { headers: { 'Content-Type': 'multipart/form-data' } })).data,
 };

@@ -1,4 +1,4 @@
-export type Role = 'MANAGER' | 'DISPATCHER' | 'TECHNICIAN' | 'CUSTOMER';
+export type Role = 'MANAGER' | 'DISPATCHER' | 'TECHNICIAN' | 'CUSTOMER' | 'HR';
 
 export type WorkOrderStatus = 
   | 'NEW' 
@@ -131,6 +131,12 @@ export interface WorkOrder {
   updatedAt?: string;
   completedAt?: string;
   closedAt?: string;
+  closedByName?: string | null;
+  cancelledAt?: string | null;
+  cancelledByName?: string | null;
+  cancellationReason?: string | null;
+  // True when the signed-in user may cancel this request now (not started yet).
+  cancellable?: boolean;
 
   statusHistory?: WorkOrderStatusHistory[];
   partsUsed?: PartUsage[];
@@ -158,14 +164,18 @@ export interface DashboardMetrics {
 export type NotificationType =
   | 'WORK_ORDER_CREATED' | 'WORK_ORDER_ASSIGNED' | 'TECHNICIAN_ASSIGNMENT' | 'WORK_ORDER_STATUS'
   | 'WORK_ORDER_COMPLETED' | 'CRITICAL_WORK_ORDER' | 'PAYMENT_PENDING' | 'PAYMENT_RECEIVED'
-  | 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED' | 'EMAIL_VERIFIED' | 'SECURITY' | 'CUSTOMER_REGISTERED' | 'ATTENDANCE';
+  | 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED' | 'EMAIL_VERIFIED' | 'SECURITY' | 'CUSTOMER_REGISTERED' | 'ATTENDANCE'
+  | 'WORK_ORDER_CANCELLED'
+  | 'JOB_APPLICATION'
+  | 'INTERVIEW_SCHEDULED'
+  | 'HIRING_UPDATE';
 
 export interface AppNotification {
   id: number;
   type: NotificationType;
   title: string;
   message: string;
-  referenceType?: 'WORK_ORDER' | 'PAYMENT' | null;
+  referenceType?: 'WORK_ORDER' | 'PAYMENT' | 'APPLICATION' | null;
   referenceId?: number | null;
   referenceLabel?: string | null;
   read: boolean;
@@ -207,6 +217,36 @@ export interface PaymentConfig {
   upiEnabled: boolean;
   upiVpa?: string | null;
   payeeName: string;
+  currency: string;
+}
+
+// Company-wide figures; the backend returns them to managers only.
+export interface PaymentStats {
+  totalRevenue: number;
+  totalPayments: number;
+  paidPayments: number;
+  cashPayments: number;
+  upiPayments: number;
+  qrPayments: number;
+  cardPayments: number;
+  cashRevenue: number;
+  upiRevenue: number;
+  qrRevenue: number;
+  cardRevenue: number;
+  pendingPayments: number;
+  pendingAmount: number;
+  failedPayments: number;
+  cancelledPayments: number;
+  currency: string;
+}
+
+// Totals over the signed-in customer's own payments.
+export interface MyPaymentSummary {
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  paymentCount: number;
+  pendingCount: number;
   currency: string;
 }
 
@@ -263,4 +303,126 @@ export interface CustomerAccount {
   totalPaid?: number | null;
   recentWorkOrders?: { id: number; code: string; title: string; status: WorkOrderStatus; createdAt: string }[];
   payments?: Payment[];
+}
+
+// ---------- Recruitment (HR) ----------
+export type JobStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERNSHIP';
+export type ApplicationStatus =
+  | 'APPLIED' | 'UNDER_REVIEW' | 'SHORTLISTED' | 'INTERVIEW_SCHEDULED' | 'SELECTED' | 'REJECTED' | 'HIRED';
+export type InterviewType = 'IN_PERSON' | 'PHONE' | 'VIDEO';
+export type InterviewStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+
+export interface JobOpening {
+  id: number;
+  title: string;
+  department: string;
+  description: string;
+  requiredSkills?: string | null;
+  location: string;
+  employmentType: EmploymentType;
+  applicationDeadline?: string | null;
+  status?: JobStatus;
+  acceptingApplications?: boolean;
+  applicationCount?: number;
+  createdByName?: string | null;
+  createdAt?: string;
+}
+
+export interface JobOpeningInput {
+  title: string;
+  department: string;
+  description: string;
+  requiredSkills?: string;
+  location: string;
+  employmentType: EmploymentType;
+  applicationDeadline?: string | null;
+}
+
+export interface Interview {
+  id: number;
+  applicationId: number;
+  applicationReference: string;
+  candidateName: string;
+  jobTitle: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  type: InterviewType;
+  locationOrLink: string;
+  interviewer: string;
+  instructions?: string | null;
+  status: InterviewStatus;
+  rescheduleCount: number;
+  candidateEmailed: boolean;
+  scheduledByName?: string | null;
+}
+
+export interface InterviewInput {
+  scheduledAt: string;
+  durationMinutes: number;
+  type: InterviewType;
+  locationOrLink: string;
+  interviewer: string;
+  instructions?: string;
+}
+
+export interface ApplicationHistoryEntry {
+  id: number;
+  fromStatus?: ApplicationStatus | null;
+  toStatus?: ApplicationStatus | null;
+  action: string;
+  changedByName: string;
+  changedAt: string;
+}
+
+export interface JobApplication {
+  id: number;
+  reference: string;
+  jobOpeningId: number;
+  jobTitle: string;
+  department: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  experience?: string | null;
+  skills?: string | null;
+  education?: string | null;
+  coverLetter?: string | null;
+  resumeFileName: string;
+  resumeSizeBytes: number;
+  status: ApplicationStatus;
+  allowedNextStatuses: ApplicationStatus[];
+  rejectionReason?: string | null;
+  internalNotes?: string | null;
+  employeeUserId?: number | null;
+  employeeEmail?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  interviews?: Interview[];
+  history?: ApplicationHistoryEntry[];
+}
+
+export interface ApplicationForm {
+  fullName: string;
+  email: string;
+  phone: string;
+  experience: string;
+  skills: string;
+  education: string;
+  coverLetter: string;
+}
+
+export interface HrStats {
+  totalOpenings: number;
+  publishedOpenings: number;
+  totalApplications: number;
+  newApplications: number;
+  underReview: number;
+  shortlisted: number;
+  interviewsScheduled: number;
+  upcomingInterviews: number;
+  selected: number;
+  rejected: number;
+  hired: number;
+  candidateEmailEnabled: boolean;
 }

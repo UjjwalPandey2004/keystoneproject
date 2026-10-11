@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Bell, CalendarCheck, CheckCircle2, ClipboardList, CreditCard, ShieldCheck, UserCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, Ban, Bell, CalendarCheck, CalendarClock, CheckCircle2, ClipboardList, CreditCard, FileText, ShieldCheck, UserCheck, XCircle } from 'lucide-react';
 import { AppNotification, NotificationType, Role } from '../types';
 import { Tab } from '../navigation';
 
@@ -18,6 +18,10 @@ const STYLE: Record<NotificationType, { icon: React.ReactNode; tint: string }> =
   SECURITY: { icon: <ShieldCheck size={17} />, tint: 'ks-alert-warning' },
   CUSTOMER_REGISTERED: { icon: <UserCheck size={17} />, tint: 'ks-stat-tint-success' },
   ATTENDANCE: { icon: <CalendarCheck size={17} />, tint: 'ks-stat-tint-info' },
+  WORK_ORDER_CANCELLED: { icon: <Ban size={17} />, tint: 'ks-alert-warning' },
+  JOB_APPLICATION: { icon: <FileText size={17} />, tint: 'ks-stat-tint-info' },
+  INTERVIEW_SCHEDULED: { icon: <CalendarClock size={17} />, tint: 'ks-alert-warning' },
+  HIRING_UPDATE: { icon: <UserCheck size={17} />, tint: 'ks-stat-tint-success' },
 };
 
 export const timeAgo = (iso: string) => {
@@ -33,6 +37,9 @@ export const timeAgo = (iso: string) => {
 export const tabForNotification = (role: Role | null, n: AppNotification): Tab | null => {
   if (n.referenceType === 'PAYMENT') {
     return role === 'MANAGER' ? 'payments' : role === 'CUSTOMER' ? 'mypayments' : null;
+  }
+  if (n.referenceType === 'APPLICATION') {
+    return role === 'HR' || role === 'MANAGER' ? 'applications' : null;
   }
   if (n.referenceType === 'WORK_ORDER') {
     if (role === 'TECHNICIAN') return 'field';

@@ -1,8 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { apiError, customerApi, workOrderApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Customer, Priority, Site, WorkOrder } from '../types';
-import { Building, Clock, CreditCard, MapPin, Plus, Send, X } from 'lucide-react';
+import { Customer, Priority, Site, WorkOrder, WorkOrderStatus } from '../types';
+import { Ban, Building, Check, Clock, CreditCard, MapPin, Plus, Search, Send, X } from 'lucide-react';
+import { clearDraft, readDraft } from '../siteConfig';
+
+const CATEGORIES: Record<string, string> = { HVAC: 'HVAC', ELECTRICAL: 'Electrical', PLUMBING: 'Plumbing', GENERAL: 'General maintenance' };
+const STAGES: { status: WorkOrderStatus; label: string }[] = [
+  { status: 'NEW', label: 'Requested' },
+  { status: 'ASSIGNED', label: 'Technician assigned' },
+  { status: 'IN_PROGRESS', label: 'In progress' },
+  { status: 'COMPLETED', label: 'Completed' },
+  { status: 'CLOSED', label: 'Closed' },
+];
+const stageIndex = (status: WorkOrderStatus) => (status === 'ON_HOLD' ? 2 : STAGES.findIndex((s) => s.status === status));
+
+// Progress of a request; a cancelled one shows where it stopped.
+const ProgressTracker: React.FC<{ wo: WorkOrder }> = ({ wo }) => {
+  if (wo.status === 'CANCELLED') {
+    return (
+      <div className="ks-alert ks-alert-error" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <Ban size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+        <div>
+          <strong>Cancelled</strong>{wo.cancelledAt && ` on ${new Date(wo.cancelledAt).toLocaleString()}`}{wo.cancelledByName && ` by ${wo.cancelledByName}`}.
+          {wo.cancellationReason && <div>Reason: {wo.cancellationReason}</div>}
+        </div>
+      </div>
+    );
+  }
+  const current = stageIndex(wo.status);
+  return (
+    <ol className="ks-progress" aria-label="Request progress">
+      {STAGES.map((stage, i) => (
+        <li key={stage.status} className={i < current ? 'done' : i === current ? 'current' : ''} aria-current={i === current ? 'step' : undefined}>
+          <span className="ks-progress-dot">{i < current ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
+          <span className="ks-progress-label">{stage.label}{i === current && wo.status === 'ON_HOLD' ? ' (on hold)' : ''}</span>
+        </li>
+      ))}
+    </ol>
+  );
+};
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { Tab } from '../navigation';
 
@@ -23,7 +60,21 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [siteId, setSiteId] = useState<number | ''>('');
+  const [category, setCategory] = useState('HVAC');
+  const [preferredDate, setPreferredDate] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [fromDraft, setFromDraft] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // List filters
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | WorkOrderStatus>('ALL');
+
+  // Cancellation
+  const [cancelling, setCancelling] = useState<WorkOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const fetchPortal = async () => {
     try {
@@ -50,22 +101,86 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
     fetchPortal();
   }, []);
 
+  // A request started on the public website opens here, pre-filled, once the customer is signed in.
+  useEffect(() => {
+    if (role !== 'CUSTOMER') return;
+    const draft = readDraft();
+    if (!draft) return;
+    setCategory(draft.category in CATEGORIES ? draft.category : 'GENERAL');
+    setTitle(draft.title);
+    setPriority(draft.urgency);
+    setPreferredDate(draft.preferredDate);
+    setContactPhone(draft.contactPhone);
+    setDescription([draft.description, draft.address && `Service address: ${draft.address}`,
+      draft.contactName && `Contact on site: ${draft.contactName}`].filter(Boolean).join('\n'));
+    setFromDraft(true);
+    setFormError('');
+    setShowRaise(true);
+  }, [role]);
+
+  const shown = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return orders.filter((o) =>
+      (statusFilter === 'ALL' || (statusFilter === 'OPEN' ? !['CLOSED', 'CANCELLED'].includes(o.status) : o.status === statusFilter))
+      && (!term || [o.code, o.title, o.siteName, o.assignedToName].some((v) => v?.toLowerCase().includes(term))));
+  }, [orders, search, statusFilter]);
+
+  const closeRaise = () => {
+    setShowRaise(false);
+    if (fromDraft) {
+      clearDraft();
+      setFromDraft(false);
+    }
+  };
+
+  const confirmCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancelling) return;
+    setCancelError('');
+    try {
+      const updated = await workOrderApi.cancel(cancelling.id, cancelReason.trim());
+      setOrders((list) => list.map((o) => (o.id === updated.id ? updated : o)));
+      if (detail?.id === updated.id) setDetail(updated);
+      setNotice(`${updated.code} has been cancelled. Our dispatch team has been notified.`);
+      setCancelling(null);
+      setCancelReason('');
+    } catch (err) {
+      setCancelError(apiError(err, 'The request could not be cancelled.'));
+    }
+  };
+
   const handleRaiseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!siteId || !customer) return;
+    if (contactPhone.trim() && !/^[+]?[0-9 ()-]{7,20}$/.test(contactPhone.trim())) {
+      setFormError('Enter a valid contact phone number, or leave it empty.');
+      return;
+    }
     setSaving(true);
     try {
-      await workOrderApi.create({
-        title,
-        description,
+      // Category, preferred date and contact are recorded with the request description.
+      const details = [
+        `Category: ${CATEGORIES[category]}`,
+        preferredDate && `Preferred date: ${new Date(preferredDate + 'T00:00').toLocaleDateString([], { dateStyle: 'medium' })}`,
+        contactPhone.trim() && `Contact phone: ${contactPhone.trim()}`,
+        description.trim(),
+      ].filter(Boolean).join('\n');
+      const created = await workOrderApi.create({
+        title: title.trim(),
+        description: details,
         priority,
         customerId: customer.id,
         siteId: Number(siteId),
       });
       setShowRaise(false);
+      clearDraft();
+      setFromDraft(false);
       setTitle('');
       setDescription('');
+      setPreferredDate('');
+      setContactPhone('');
       setPriority('MEDIUM');
+      setNotice(`Request ${created.code} submitted. Use this reference to track it below.`);
       fetchPortal();
     } catch (err: any) {
       setFormError(apiError(err, 'Failed to raise request'));
@@ -90,17 +205,37 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
         </button>
       </div>
 
+      {notice && <div className="ks-alert ks-alert-success" role="status">{notice}</div>}
+      <div className="ks-filter-bar">
+        <div className="ks-search">
+          <Search size={16} aria-hidden="true" />
+          <input aria-label="Search my requests" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by reference, title, site or technician" />
+        </div>
+        <select aria-label="Filter by status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
+          <option value="ALL">All requests</option>
+          <option value="OPEN">Open requests</option>
+          <option value="NEW">New</option>
+          <option value="ASSIGNED">Assigned</option>
+          <option value="IN_PROGRESS">In progress</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="CLOSED">Closed</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+      </div>
+
       {loading ? (
         <div className="ks-empty">Loading your service requests…</div>
       ) : orders.length === 0 ? (
         <div className="card ks-empty">No service requests yet. Raise your first request to get dispatch support.</div>
+      ) : shown.length === 0 ? (
+        <div className="card ks-empty">No requests match your search.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {orders.map((wo) => (
+          {shown.map((wo) => (
             <div
               key={wo.id}
               className="card"
-              style={{ cursor: 'pointer', borderTop: `4px solid ${wo.slaBreached ? '#ef4444' : '#6366f1'}` }}
+              style={{ cursor: 'pointer', borderTop: `4px solid ${wo.status === 'CANCELLED' ? 'var(--ks-dim)' : wo.slaBreached ? 'var(--ks-danger)' : 'var(--ks-accent)'}` }}
               onClick={() => setDetail(wo)}
               role="button"
               tabIndex={0}
@@ -142,8 +277,9 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
           <div className="modal-content" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3>Raise Service Request</h3>
-              <button className="ks-icon-btn" onClick={() => setShowRaise(false)} aria-label="Close"><X size={20} /></button>
+              <button className="ks-icon-btn" onClick={closeRaise} aria-label="Close"><X size={20} /></button>
             </div>
+            {fromDraft && <div className="ks-alert ks-alert-info">We filled in the details you entered on our website. Check them, choose the site and submit.</div>}
             {formError && <div className="ks-alert ks-alert-error">{formError}</div>}
 
             <form onSubmit={handleRaiseRequest} className="ks-form">
@@ -162,9 +298,27 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
                 </select>
               </div>
 
+              <div className="ks-form-grid">
+                <div>
+                  <label className="ks-label" htmlFor="raise-category">Service category *</label>
+                  <select id="raise-category" value={category} onChange={(e) => setCategory(e.target.value)}>
+                    {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="ks-label" htmlFor="raise-date">Preferred date</label>
+                  <input id="raise-date" type="date" min={new Date().toISOString().slice(0, 10)} value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} />
+                </div>
+              </div>
+
               <div>
-                <label className="ks-label">Issue Title *</label>
-                <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. HVAC not cooling floor 3" />
+                <label className="ks-label" htmlFor="raise-title">Issue Title *</label>
+                <input id="raise-title" required maxLength={150} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. HVAC not cooling floor 3" />
+              </div>
+
+              <div>
+                <label className="ks-label" htmlFor="raise-phone">Contact phone on site</label>
+                <input id="raise-phone" type="tel" maxLength={20} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+91 98765 43210" />
               </div>
 
               <div>
@@ -183,7 +337,7 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
               </div>
 
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowRaise(false)} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={closeRaise} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   <Send size={14} /> {saving ? 'Submitting...' : 'Submit Request'}
                 </button>
@@ -211,11 +365,14 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
               {detail.slaBreached && <span className="badge badge-cancelled">SLA Breached</span>}
             </div>
 
+            <ProgressTracker wo={detail} />
+
             <div className="ks-inset" style={{ fontSize: '0.86rem', marginBottom: 16, display: 'grid', gap: 6 }}>
               <div><strong>Site:</strong> {detail.siteName} ({detail.siteAddress})</div>
               <div><strong>Technician:</strong> {detail.assignedToName || 'Pending dispatch'}</div>
               <div><strong>Target:</strong> {new Date(detail.slaDueDate).toLocaleString()}</div>
-              {detail.description && <div className="ks-muted">{detail.description}</div>}
+              {detail.closedAt && <div><strong>Closed:</strong> {new Date(detail.closedAt).toLocaleString()}{detail.closedByName && ` by ${detail.closedByName}`}</div>}
+              {detail.description && <div className="ks-muted ks-pre">{detail.description}</div>}
             </div>
 
             <h4 className="ks-section-title">Status History</h4>
@@ -238,11 +395,43 @@ export const CustomerPortal: React.FC<{ onTabChange?: (tab: Tab) => void }> = ({
             <AttachmentsPanel workOrderId={detail.id} />
 
             <div className="modal-actions">
+              {detail.cancellable && (
+                <button className="btn btn-danger" onClick={() => { setCancelError(''); setCancelReason(''); setCancelling(detail); }}>
+                  <Ban size={15} /> Cancel Request
+                </button>
+              )}
               {canPay(detail) && (
                 <button className="btn btn-primary" onClick={() => { setDetail(null); onTabChange?.('mypayments'); }}><CreditCard size={15} /> Pay for this service</button>
               )}
               <button onClick={() => setDetail(null)} className="btn btn-secondary">Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL CONFIRMATION */}
+      {cancelling && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="cancel-title">
+          <div className="modal-content" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 id="cancel-title">Cancel {cancelling.code}?</h3>
+              <button className="ks-icon-btn" onClick={() => setCancelling(null)} aria-label="Close"><X size={20} /></button>
+            </div>
+            <form className="ks-form" onSubmit={confirmCancel}>
+              <p className="ks-muted" style={{ margin: 0 }}>
+                “{cancelling.title}” will be cancelled{cancelling.assignedToName ? ` and ${cancelling.assignedToName} will be released from the job` : ''}.
+                This cannot be undone; you can raise a new request at any time.
+              </p>
+              {cancelError && <div className="ks-alert ks-alert-error">{cancelError}</div>}
+              <div>
+                <label className="ks-label" htmlFor="cancel-reason">Reason (optional)</label>
+                <textarea id="cancel-reason" rows={3} maxLength={500} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="e.g. Issue resolved itself" />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setCancelling(null)}>Keep request</button>
+                <button type="submit" className="btn btn-danger"><Ban size={15} /> Yes, cancel request</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

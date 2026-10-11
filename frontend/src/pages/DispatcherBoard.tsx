@@ -7,9 +7,9 @@ import { AttachmentsPanel } from '../components/AttachmentsPanel';
 
 const STATUS_COLUMNS: { key: WorkOrderStatus; title: string; color: string }[] = [
   { key: 'NEW', title: 'New', color: '#3b82f6' },
-  { key: 'ASSIGNED', title: 'Assigned', color: '#8b5cf6' },
-  { key: 'IN_PROGRESS', title: 'In Progress', color: '#f59e0b' },
-  { key: 'ON_HOLD', title: 'On Hold', color: '#ea580c' },
+  { key: 'ASSIGNED', title: 'Assigned', color: '#0ea5e9' },
+  { key: 'IN_PROGRESS', title: 'In Progress', color: '#eab308' },
+  { key: 'ON_HOLD', title: 'On Hold', color: '#64748b' },
   { key: 'COMPLETED', title: 'Completed', color: '#10b981' },
   { key: 'CLOSED', title: 'Closed', color: '#64748b' },
 ];

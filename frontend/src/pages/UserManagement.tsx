@@ -3,7 +3,7 @@ import { Pencil, UserPlus, X } from 'lucide-react';
 import { apiError, customerApi, userApi } from '../services/api';
 import { Customer, Role, User } from '../types';
 
-const roles: Role[] = ['MANAGER', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
+const roles: Role[] = ['MANAGER', 'HR', 'DISPATCHER', 'TECHNICIAN', 'CUSTOMER'];
 
 const emptyForm = { userName: '', userEmail: '', password: '', phone: '', role: 'TECHNICIAN' as Role, customerId: '', location: '' };
 
